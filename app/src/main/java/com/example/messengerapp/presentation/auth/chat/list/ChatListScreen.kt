@@ -29,31 +29,23 @@ fun ChatListScreen(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-
         topBar = {
             TopAppBar(
                 title = { Text("Сообщения") },
                 actions = {
                     IconButton(onClick = { navController.navigate(Screen.Profile.route) }) {
-                        Icon(
-                            imageVector = Icons.Default.Person,
-                            contentDescription = "Профиль"
-                        )
+                        Icon(Icons.Default.Person, contentDescription = "Профиль")
                     }
                 }
             )
         },
-
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { navController.navigate(Screen.Search.route) },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary
             ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Найти собеседника"
-                )
+                Icon(Icons.Default.Add, contentDescription = "Найти собеседника")
             }
         }
     ) { paddingValues ->
@@ -71,10 +63,13 @@ fun ChatListScreen(
                 }
             }
 
-            items(state.chats) { chat ->
+            items(state.chats) { chatWithPartner ->
+
                 ChatItem(
-                    chat = chat,
-                    onClick = { navController.navigate(Screen.ChatDetail.createRoute(chat.id)) }
+                    item = chatWithPartner,
+                    onClick = {
+                        navController.navigate(Screen.ChatDetail.createRoute(chatWithPartner.chat.id))
+                    }
                 )
             }
         }
