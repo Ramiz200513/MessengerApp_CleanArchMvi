@@ -18,11 +18,14 @@ class FirebaseChatRepositoryImpl @Inject constructor(
     private val auth: FirebaseAuth
 ) : ChatRepository {
     override suspend fun sendMessage(chatId: String, message: Message){
+        val messageToSend = message.copy(
+            timestamp = System.currentTimeMillis()
+        )
         firestore.collection("chats")
             .document(chatId)
             .collection("messages")
             .document(message.id)
-            .set(message)
+            .set(messageToSend)
             .await()
         firestore.collection("chats").document(chatId)
             .update("lastModified", System.currentTimeMillis())
@@ -61,7 +64,7 @@ class FirebaseChatRepositoryImpl @Inject constructor(
     override fun getMessages(chatId: String): Flow<List<Message>> { // <-- chatId приходит сюда
         return callbackFlow {
             val query = firestore.collection("chats")
-                .document(chatId) // <--- ИСПРАВЛЕНИЕ: Используем chatId вместо "general"
+                .document(chatId)
                 .collection("messages")
                 .orderBy("timestamp", Query.Direction.DESCENDING)
 
@@ -89,7 +92,8 @@ class FirebaseChatRepositoryImpl @Inject constructor(
             }
             val chatData = hashMapOf(
                 "participants" to listOf(currentUserId,otherUserId),
-                "lastModified" to System.currentTimeMillis()
+                "lastModified" to System.currentTimeMillis(),
+                "typing" to emptyMap<String,Boolean>()
             )
             val documentReference = firestore.collection("chats")
                 .add(chatData)
@@ -98,6 +102,39 @@ class FirebaseChatRepositoryImpl @Inject constructor(
 
         } catch (e: Exception) {
             Result.failure(e)
+        }
+    }
+
+    override suspend fun setTypingStatus(chatId: String, isTyping: Boolean) {
+
+        val currentUserId = auth.currentUser?.uid ?: return
+        try {
+            firestore.collection("chats")
+                .document(chatId)
+                .update("typing.$currentUserId", isTyping)
+                .await()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    override fun observeChat(chatId: String): Flow<Chat> {
+        return callbackFlow {
+            val listener = firestore.collection("chats")
+                .document(chatId)
+                .addSnapshotListener { snapshot, error ->
+                    if (error != null) {
+                        close(error)
+                        return@addSnapshotListener
+                    }
+                    if (snapshot != null && snapshot.exists()) {
+                        val chat = snapshot.toObject(Chat::class.java)?.copy(id = snapshot.id)
+                        if (chat != null) {
+                            trySend(chat)
+                        }
+                    }
+                }
+            awaitClose { listener.remove() }
         }
     }
 

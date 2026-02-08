@@ -4,6 +4,7 @@ import com.example.domain.domain.model.User
 import com.example.domain.domain.repository.AuthRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 
@@ -47,9 +48,12 @@ class FirebaseAuthRepositoryImpl @Inject constructor(
         return try {
             val uid = auth.currentUser?.uid
             if (uid != null) {
-                val document = firestore.collection("users").document(uid).get().await()
-                // Тут User::class.java сработает, если в домейне есть дефолтные значения
-                val user = document.toObject(User::class.java)
+                val snapshot = firestore.collection("users")
+                    .document(uid)
+                    .get()
+                    .await()
+
+                val user = snapshot.toObject(User::class.java)
                 Result.success(user)
             } else {
                 Result.success(null)
