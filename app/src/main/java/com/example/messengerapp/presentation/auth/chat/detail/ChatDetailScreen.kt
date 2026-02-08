@@ -21,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
@@ -31,23 +32,62 @@ import com.example.messengerapp.presentation.auth.chat.detail.messageBubble.Mess
 @Composable
 fun ChatDetailScreen(
     navController: NavController,
-    viewModel: ChatDetailViewModel = hiltViewModel(),
-    chatId:String
+
+    chatId: String,
+    viewModel: ChatDetailViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
-    val myUserId = state.currentUserId
+
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Чат...") },
+                title = {
+                    Column {
+                        Text("Чат..")
+                        if (state.isOpponentTyping) {
+                            Text(
+                                "печатает...",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
                 }
             )
-        },
-        bottomBar = {
+        }
+
+    ) { paddingValues ->
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .imePadding()
+        ) {
+            LazyColumn(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                reverseLayout = true,
+                contentPadding = PaddingValues(8.dp)
+            ) {
+                items(state.messages) { message ->
+                    MessageBubble(
+                        message = message,
+                        isOwnMessage = message.senderId == state.currentUserId
+                    )
+                }
+            }
+
+
+
+
             MessageInput(
                 text = viewModel.messageText,
                 onTextChange = {
@@ -56,39 +96,16 @@ fun ChatDetailScreen(
                 onSendClick = {
                     viewModel.handleIntent(ChatDetailIntent.OnSendClick)
                 },
-                modifier = Modifier.imePadding() // 🔥 клавиатура
             )
         }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier.fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            LazyColumn(
-                modifier = Modifier.weight(1f)
-                    .fillMaxWidth(),
-                reverseLayout = true,
-                contentPadding = PaddingValues(8.dp)
-            ) {
-                items(state.message) { message ->
-                    MessageBubble(message, isOwnMessage = message.senderId == myUserId)
-                }
 
-            }
-
-        }
-
-
+        // ОШИБКИ
         if (state.error != null) {
-
             Text(
                 text = state.error!!,
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.padding(8.dp)
             )
         }
-
-
     }
-
 }
