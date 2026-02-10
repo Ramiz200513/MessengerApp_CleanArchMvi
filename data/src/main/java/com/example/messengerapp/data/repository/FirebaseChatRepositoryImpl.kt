@@ -48,8 +48,6 @@ class FirebaseChatRepositoryImpl @Inject constructor(
                 }
                 if (snapshot!=null){
                     val chats = snapshot.documents.mapNotNull { doc ->
-                        // ОШИБКА БЫЛА ТУТ: doc.toObject(Chat::class.java)
-                        // НУЖНО ТАК:
                         doc.toObject(Chat::class.java)?.copy(id = doc.id)
                     }
                     trySend(chats)
@@ -61,7 +59,7 @@ class FirebaseChatRepositoryImpl @Inject constructor(
         }
     }
 
-    override fun getMessages(chatId: String): Flow<List<Message>> { // <-- chatId приходит сюда
+    override fun getMessages(chatId: String): Flow<List<Message>> {
         return callbackFlow {
             val query = firestore.collection("chats")
                 .document(chatId)
@@ -90,11 +88,24 @@ class FirebaseChatRepositoryImpl @Inject constructor(
             if (currentUserId == null) {
                 return Result.failure(Exception("User not logged in"))
             }
+            val querySnapshot = firestore.collection("chats")
+                .whereArrayContains("participants",currentUserId)
+                .get()
+                .await()
+            val existingChat = querySnapshot.documents.find { document ->
+                val chat = document.toObject(Chat::class.java)
+                chat?.participants?.contains(otherUserId) == true
+            }
+            if(existingChat!=null){
+                return Result.success(existingChat.id)
+            }
+
             val chatData = hashMapOf(
                 "participants" to listOf(currentUserId,otherUserId),
                 "lastModified" to System.currentTimeMillis(),
                 "typing" to emptyMap<String,Boolean>()
             )
+
             val documentReference = firestore.collection("chats")
                 .add(chatData)
                 .await()
@@ -106,7 +117,6 @@ class FirebaseChatRepositoryImpl @Inject constructor(
     }
 
     override suspend fun setTypingStatus(chatId: String, isTyping: Boolean) {
-
         val currentUserId = auth.currentUser?.uid ?: return
         try {
             firestore.collection("chats")
@@ -137,5 +147,4 @@ class FirebaseChatRepositoryImpl @Inject constructor(
             awaitClose { listener.remove() }
         }
     }
-
 }

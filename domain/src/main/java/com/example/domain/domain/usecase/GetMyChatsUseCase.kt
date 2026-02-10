@@ -16,8 +16,6 @@ class GetMyChatsUseCase @Inject constructor(
     operator fun invoke(): Flow<List<ChatWithPartner>> {
         return chatRepository.getChats()
             .map { chats ->
-
-
                 val myIdResult = getCurrentUserUseCase()
                 val myId = myIdResult.getOrNull()?.id ?: ""
 
