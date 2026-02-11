@@ -8,4 +8,6 @@ data class Chat (
     val name:String = "",
     val description:String? = null,
     val participants: List<String> = emptyList(),
+    val typing: Map<String, Boolean> = emptyMap(),
+    val lastModified: Long = 0L,
 )

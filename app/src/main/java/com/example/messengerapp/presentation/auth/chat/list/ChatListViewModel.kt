@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.domain.domain.repository.ChatRepository
 import com.example.domain.domain.usecase.GetChatsUseCase
+import com.example.domain.domain.usecase.GetMyChatsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,7 +19,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class ChatListViewModel @Inject constructor(
-    private val getChatsUseCase: GetChatsUseCase
+    private val getChatsUseCase: GetMyChatsUseCase
 ): ViewModel() {
     private val _state = MutableStateFlow<ChatListState>(ChatListState())
     val state = _state.asStateFlow()
