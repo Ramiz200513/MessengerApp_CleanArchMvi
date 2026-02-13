@@ -1,26 +1,37 @@
 package com.example.messengerapp.data.repository
 
 import com.example.domain.domain.model.Chat
+import com.example.domain.domain.model.ChatWithMessages
 import com.example.domain.domain.model.Message
 import com.example.domain.domain.repository.ChatRepository
+import com.example.messengerapp.data.local.dao.ChatDao
+import com.example.messengerapp.data.local.dao.MessageDao
+import com.example.messengerapp.data.local.entities.ChatEntity
+import com.example.messengerapp.data.local.mappers.toDomain
+import com.example.messengerapp.data.local.mappers.toEntity
 import com.google.firebase.auth.FirebaseAuth
-
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 
 class FirebaseChatRepositoryImpl @Inject constructor(
     private val firestore: FirebaseFirestore,
-    private val auth: FirebaseAuth
+    private val auth: FirebaseAuth,
+    private val chatDao: ChatDao,
+    private val messageDao: MessageDao
 ) : ChatRepository {
     override suspend fun sendMessage(chatId: String, message: Message){
         val messageToSend = message.copy(
             timestamp = System.currentTimeMillis()
         )
+        val entity = messageToSend.toEntity().copy(chatId = chatId)
+        messageDao.upsertMessages(listOf(entity))
         firestore.collection("chats")
             .document(chatId)
             .collection("messages")
@@ -32,35 +43,50 @@ class FirebaseChatRepositoryImpl @Inject constructor(
     }
 
     override fun getChats(): Flow<List<Chat>> {
-        return callbackFlow {
+        return channelFlow {
             val currentUserId = auth.currentUser?.uid
-            if (currentUserId == null) {
-                close(Exception("User not logged in"))
-                return@callbackFlow
-            }
-            val query = firestore.collection("chats")
-                .whereArrayContains("participants", currentUserId)
-                .orderBy("lastModified", Query.Direction.DESCENDING)
-            val listener = query.addSnapshotListener { snapshot,error ->
-                if(error != null){
-                    close(error)
-                    return@addSnapshotListener
+            val localDataJob = launch {
+                chatDao.getChats().collect { entities ->
+                    send(entities.map { it.toDomain() })
                 }
-                if (snapshot!=null){
-                    val chats = snapshot.documents.mapNotNull { doc ->
-                        doc.toObject(Chat::class.java)?.copy(id = doc.id)
+            }
+            val listenerRegistration = if (currentUserId != null) {
+                firestore.collection("chats")
+                    .whereArrayContains("participants", currentUserId)
+                    .addSnapshotListener { snapshot, error ->
+                        if (error != null) {
+                            return@addSnapshotListener
+                        }
+                        if (snapshot != null) {
+                            val chats = snapshot.documents.mapNotNull { doc ->
+                                doc.toObject(Chat::class.java)?.copy(id = doc.id)
+                            }
+                            launch {
+                                chatDao.upsertChats(chats.map { it.toEntity() })
+                            }
+                        }
                     }
-                    trySend(chats)
-                }
+            } else {
+                null
             }
-        awaitClose {
-            listener.remove()
-        }
+
+            awaitClose {
+                listenerRegistration?.remove()
+                localDataJob.cancel()
+            }
         }
     }
 
+
+
+
     override fun getMessages(chatId: String): Flow<List<Message>> {
-        return callbackFlow {
+        return channelFlow {
+            val localJob = launch {
+                messageDao.getMessagesByChatId(chatId).collect { entities ->
+                    send(entities.map { it.toDomain() })
+                }
+            }
             val query = firestore.collection("chats")
                 .document(chatId)
                 .collection("messages")
@@ -68,22 +94,34 @@ class FirebaseChatRepositoryImpl @Inject constructor(
 
             val listener = query.addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    close(error)
                     return@addSnapshotListener
                 }
                 if (snapshot != null) {
                     val messages = snapshot.toObjects(Message::class.java)
-                    trySend(messages)
+                    val entities = messages.map { message ->
+                        message.toEntity().copy(chatId = chatId)
+                    }
+                    launch {
+                        messageDao.upsertMessages(entities)
+                    }
                 }
             }
             awaitClose {
                 listener.remove()
+                localJob.cancel()
             }
         }
     }
 
     override suspend fun createChat(otherUserId: String): Result<String> {
         return try {
+            val localChats = chatDao.getChatsOneShot()
+            val existingChats = localChats.find { chatEntity ->
+                chatEntity.participantsCsv.contains(otherUserId)
+            }
+            if (existingChats != null) {
+                return Result.success(existingChats.id)
+            }
             val currentUserId = auth.currentUser?.uid
             if (currentUserId == null) {
                 return Result.failure(Exception("User not logged in"))
@@ -109,6 +147,13 @@ class FirebaseChatRepositoryImpl @Inject constructor(
             val documentReference = firestore.collection("chats")
                 .add(chatData)
                 .await()
+            val newChatId = documentReference.id
+            val newChatEntity = ChatEntity(
+                id = newChatId,
+                lastModified = System.currentTimeMillis(),
+                participantsCsv = listOf(currentUserId,otherUserId).joinToString(",")
+            )
+            chatDao.upsertChats(listOf(newChatEntity))
             Result.success(documentReference.id)
 
         } catch (e: Exception) {
@@ -145,6 +190,48 @@ class FirebaseChatRepositoryImpl @Inject constructor(
                     }
                 }
             awaitClose { listener.remove() }
+        }
+    }
+
+    override fun getChatsWithMessages(): Flow<List<ChatWithMessages>> {
+        return channelFlow {
+            val currentUserId = auth.currentUser?.uid
+
+            val localJob = launch {
+                chatDao.getChatsWithLastMessages().collect { entitiesList ->
+                    val domainList = entitiesList.map { entity ->
+                        ChatWithMessages(
+                            chat = entity.chat.toDomain(),
+                            messages = entity.messages.map { it.toDomain() }
+                        )
+                    }
+                    send(domainList)
+                }
+            }
+
+            val listenerRegistration = if (currentUserId != null) {
+                firestore.collection("chats")
+                    .whereArrayContains("participants", currentUserId)
+                    .addSnapshotListener { snapshot, error ->
+                        if (error != null) return@addSnapshotListener
+
+                        if (snapshot != null) {
+                            val chats = snapshot.documents.mapNotNull { doc ->
+                                doc.toObject(Chat::class.java)?.copy(id = doc.id)
+                            }
+                            launch {
+                                chatDao.upsertChats(chats.map { it.toEntity() })
+                            }
+                        }
+                    }
+            } else {
+                null
+            }
+
+            awaitClose {
+                listenerRegistration?.remove()
+                localJob.cancel()
+            }
         }
     }
 }

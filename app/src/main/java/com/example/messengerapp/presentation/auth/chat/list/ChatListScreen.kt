@@ -63,13 +63,14 @@ fun ChatListScreen(
                 }
             }
 
-            items(state.chats) { chatWithPartner ->
+            items(state.chats, key = {it.chat.id}) { chatWithPartner ->
 
                 ChatItem(
                     item = chatWithPartner,
                     onClick = {
                         navController.navigate(Screen.ChatDetail.createRoute(chatWithPartner.chat.id))
-                    }
+                    },
+                    modifier = Modifier.animateItem()
                 )
             }
         }

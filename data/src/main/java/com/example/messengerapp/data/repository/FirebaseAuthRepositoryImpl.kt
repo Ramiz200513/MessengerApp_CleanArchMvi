@@ -2,20 +2,37 @@ package com.example.messengerapp.data.repository
 
 import com.example.domain.domain.model.User
 import com.example.domain.domain.repository.AuthRepository
+import com.example.messengerapp.data.local.AppDatabase
+import com.example.messengerapp.data.local.dao.UserDao
+import com.example.messengerapp.data.local.mappers.toDomain
+import com.example.messengerapp.data.local.mappers.toEntity
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 
 class FirebaseAuthRepositoryImpl @Inject constructor(
     private val auth: FirebaseAuth,
-    private val firestore: FirebaseFirestore
+    private val firestore: FirebaseFirestore,
+    private val userDao: UserDao,
+    private val db: AppDatabase,
 ) : AuthRepository {
 
     override suspend fun signIn(email: String, password: String): Result<Unit> {
         return try {
-            auth.signInWithEmailAndPassword(email, password).await()
+            val authResult = auth.signInWithEmailAndPassword(email,password).await()
+            val uid = authResult.user?.uid
+            if(uid!=null){
+                val snapshot = firestore.collection("users")
+                    .document(uid)
+                    .get()
+                    .await()
+                val networkUser = snapshot.toObject(User::class.java)
+
+                if (networkUser != null) {
+                    userDao.upsertUser(networkUser.toEntity())
+                }
+            }
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -34,10 +51,11 @@ class FirebaseAuthRepositoryImpl @Inject constructor(
                 photoUrl = null,
                 isOnline = true
             )
-
             firestore.collection("users").document(uid)
                 .set(newUser)
                 .await()
+            userDao.upsertUser(newUser.toEntity())
+
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -45,16 +63,27 @@ class FirebaseAuthRepositoryImpl @Inject constructor(
     }
 
     override suspend fun getCurrentUser(): Result<User?> {
-        return try {
-            val uid = auth.currentUser?.uid
-            if (uid != null) {
-                val snapshot = firestore.collection("users")
-                    .document(uid)
-                    .get()
-                    .await()
+        val currentUserId = auth.currentUser?.uid
+        if (currentUserId == null) {
+            return Result.failure(Exception("User not logged in"))
+        }
 
-                val user = snapshot.toObject(User::class.java)
-                Result.success(user)
+        return try {
+            val localUserEntity = userDao.getUserById(currentUserId)
+            if (localUserEntity != null) {
+
+                return Result.success(localUserEntity.toDomain())
+            }
+            val snapshot = firestore.collection("users")
+                .document(currentUserId)
+                .get()
+                .await()
+
+            val networkUser = snapshot.toObject(User::class.java)
+
+            if (networkUser != null) {
+                userDao.upsertUser(networkUser.toEntity())
+                Result.success(networkUser)
             } else {
                 Result.success(null)
             }
@@ -63,7 +92,14 @@ class FirebaseAuthRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun signOut() {
-        auth.signOut()
+    override suspend fun signOut(): Result<Unit> {
+        return try {
+            auth.signOut()
+            db.clearAllTablesData()
+
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 }

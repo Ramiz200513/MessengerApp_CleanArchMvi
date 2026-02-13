@@ -1,14 +1,12 @@
 package com.example.messengerapp.presentation.auth.profile
 
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.runtime.collectAsState
-import androidx.lifecycle.SavedStateHandle
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.domain.domain.usecase.GetCurrentUserUseCase
 import com.example.domain.domain.usecase.SaveProfileUseCase
 import com.example.domain.domain.usecase.SignOutUseCase
+import com.example.domain.domain.usecase.UploadAvatarUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,16 +14,16 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-import kotlin.math.sign
 
 @HiltViewModel
 class ProfileViewModel @Inject constructor(
     private val getCurrentUserUseCase: GetCurrentUserUseCase,
     private val signOutUseCase: SignOutUseCase,
     private val saveProfileUseCase: SaveProfileUseCase,
-    savedStateHandle: SavedStateHandle
+    private val uploadAvatarUseCase: UploadAvatarUseCase,
 ): ViewModel(){
-    private val _state = MutableStateFlow(ProfileState())
+    private val _state = MutableStateFlow(ProfileState(
+    ))
     val state: StateFlow<ProfileState> = _state.asStateFlow()
     init{
         handleIntent(ProfileIntent.LoadProfile)
@@ -35,7 +33,7 @@ class ProfileViewModel @Inject constructor(
             ProfileIntent.LoadProfile -> {
                loadProfile()
             }
-            is ProfileIntent.OnAvatarChanged -> { updateAvatarInState(intent.url) }
+            is ProfileIntent.OnAvatarChanged -> { updateAvatarInState(intent.uri) }
             is ProfileIntent.OnNameChanged -> {updateNameInState(intent.newName)}
             is ProfileIntent.OnSaveProfile -> {
                 saveChanges()
@@ -46,10 +44,21 @@ class ProfileViewModel @Inject constructor(
         }
     }
 
-    private fun updateAvatarInState(url: String) {
-        val currentUser = _state.value.user
-        if(currentUser!=null){
-            _state.update { it.copy(user = currentUser.copy(photoUrl = url)) }
+    private fun updateAvatarInState(uri: Uri) {
+        viewModelScope.launch {
+            _state.update { it.copy(isLoading = true) }
+
+            uploadAvatarUseCase(uri = uri).onSuccess { newUrl ->
+                _state.update { currentState ->
+                    val updatedUser = currentState.user?.copy(photoUrl = newUrl)
+                    currentState.copy(
+                        isLoading = false,
+                        user = updatedUser
+                    )
+                }
+            }.onFailure { e ->
+                _state.update { it.copy(isLoading = false, error = e.message) }
+            }
         }
     }
 
@@ -83,8 +92,13 @@ class ProfileViewModel @Inject constructor(
 
     private fun logOut() {
         viewModelScope.launch {
-            signOutUseCase()
-            _state.update { it.copy(isSignedOut = true) }
+            _state.update { it.copy(isLoading = true) }
+
+            signOutUseCase().onSuccess {
+                _state.update { it.copy(isSignedOut = true, isLoading = false) }
+            }.onFailure { e ->
+                _state.update { it.copy(isLoading = false, error = e.message) }
+            }
         }
     }
 
