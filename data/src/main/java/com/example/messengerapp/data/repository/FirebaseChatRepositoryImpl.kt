@@ -1,5 +1,6 @@
 package com.example.messengerapp.data.repository
 
+import android.net.Uri
 import com.example.domain.domain.model.Chat
 import com.example.domain.domain.model.ChatWithMessages
 import com.example.domain.domain.model.Message
@@ -12,19 +13,22 @@ import com.example.messengerapp.data.local.mappers.toEntity
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
+import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import java.util.UUID
 import javax.inject.Inject
 
 class FirebaseChatRepositoryImpl @Inject constructor(
     private val firestore: FirebaseFirestore,
     private val auth: FirebaseAuth,
     private val chatDao: ChatDao,
-    private val messageDao: MessageDao
+    private val messageDao: MessageDao,
+    private val storage: FirebaseStorage
 ) : ChatRepository {
     override suspend fun sendMessage(chatId: String, message: Message){
         val messageToSend = message.copy(
@@ -97,7 +101,16 @@ class FirebaseChatRepositoryImpl @Inject constructor(
                     return@addSnapshotListener
                 }
                 if (snapshot != null) {
-                    val messages = snapshot.toObjects(Message::class.java)
+                    val messages = snapshot.documents.map { doc ->
+                        Message(
+                            id = doc.id,
+                            text = doc.getString("text"),
+                            imageUrl = doc.getString("imageUrl"),
+                            senderId = doc.getString("senderId") ?: "",
+                            timestamp = doc.getLong("timestamp") ?: 0L,
+                            isRead = doc.getBoolean("isRead") ?: false
+                        )
+                    }
                     val entities = messages.map { message ->
                         message.toEntity().copy(chatId = chatId)
                     }
@@ -232,6 +245,64 @@ class FirebaseChatRepositoryImpl @Inject constructor(
                 listenerRegistration?.remove()
                 localJob.cancel()
             }
+        }
+    }
+
+    override suspend fun sendImageMessage(
+        chatId: String,
+        image: Uri
+    ): Result<Unit> {
+        return try {
+            val currentUserId = auth.currentUser?.uid ?: throw Exception("User not logged in")
+            val imageId = UUID.randomUUID().toString()
+            val storageRef = storage.reference.child("chats/$chatId/images/$imageId.jpg")
+            storageRef.putFile(image).await()
+            val downloadUrl = storageRef.downloadUrl.await().toString()
+            val message = Message(
+                id = imageId,
+                text = "",
+                imageUrl = downloadUrl,
+                senderId = currentUserId,
+                timestamp = System.currentTimeMillis()
+            )
+            sendMessage(chatId, message)
+            Result.success(Unit)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun deleteMessage(
+        chatId: String,
+        messageId: String
+    ): Result<Unit> {
+        return try {
+            firestore.collection("chats")
+                .document(chatId)
+                .collection("messages")
+                .document(messageId)
+                .delete()
+                .await()
+            messageDao.deleteMessageById(messageId)
+            Result.success(Unit)
+        }catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun markMessageAsRead(chatId: String, messageId: String) {
+        try {
+            messageDao.markAsRead(messageId)
+            firestore.collection("chats")
+                .document(chatId)
+                .collection("messages")
+                .document(messageId)
+                .update("isRead", true)
+                .await()
+
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 }

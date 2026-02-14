@@ -1,18 +1,23 @@
 package com.example.messengerapp.presentation.auth.chat.detail
 
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
+import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.domain.domain.model.Message
+import com.example.domain.domain.usecase.DeleteMessageUseCase
 import com.example.domain.domain.usecase.GetCurrentUserUseCase
 import com.example.domain.domain.usecase.SendMessageUseCase
 import com.example.domain.domain.usecase.GetMessagesUseCase
+import com.example.domain.domain.usecase.GetUserByIdUseCase
+import com.example.domain.domain.usecase.MarkMessageAsReadUseCase
 import com.example.domain.domain.usecase.ObserveChatUseCase
+import com.example.domain.domain.usecase.SendImageMessageUseCase
 import com.example.domain.domain.usecase.SetTypingStatusUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -23,6 +28,7 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import kotlin.coroutines.cancellation.CancellationException
 
 @HiltViewModel
 class ChatDetailViewModel @Inject constructor(
@@ -31,21 +37,19 @@ class ChatDetailViewModel @Inject constructor(
     private val setTypingStatusUseCase: SetTypingStatusUseCase,
     private val observeChatUseCase: ObserveChatUseCase,
     private val getCurrentUserUseCase: GetCurrentUserUseCase,
+    private val sendImageMessageUseCase: SendImageMessageUseCase,
+    private val getUserByIdUseCase: GetUserByIdUseCase,
+    private val deleteMessageUseCase: DeleteMessageUseCase,
+    private val markMessageAsReadUseCase: MarkMessageAsReadUseCase,
     savedStateHandle: SavedStateHandle,
-): ViewModel() {
+    ): ViewModel() {
 
-    var messageText by mutableStateOf("")
-        private set // FIX: Закрываем сеттер, чтобы менять только через Intent
 
     private val chatId: String = checkNotNull(savedStateHandle["chatId"])
 
     private val _state = MutableStateFlow(ChatDetailState())
     val state = _state.asStateFlow()
-
     private var typingJob: Job? = null
-
-    // Локальная переменная для ID, чтобы не дергать UseCase постоянно
-    private var myUserId: String = ""
 
     init {
         loadCurrentUser()
@@ -56,23 +60,31 @@ class ChatDetailViewModel @Inject constructor(
     private fun loadCurrentUser() {
         viewModelScope.launch {
             val result = getCurrentUserUseCase()
-            myUserId = result.getOrNull()?.id ?: ""
-            _state.update { it.copy(currentUserId = myUserId) }
+            val userId = result.getOrNull()?.id ?: ""
+            _state.update { it.copy(currentUserId = userId) }
+            if (userId.isNotBlank()) {
+                markUnreadMessagesAsRead(_state.value.messages)
+            }
         }
     }
 
     private fun observeChatStatus() {
         observeChatUseCase(chatId)
             .onEach { chat ->
-                if (myUserId.isBlank()) {
-                    val result = getCurrentUserUseCase()
-                    myUserId = result.getOrNull()?.id ?: ""
+                val myId = _state.value.currentUserId
+                if (myId.isBlank()) return@onEach
+                val partnerId = chat.participants.firstOrNull { it != myId } ?: ""
+
+                if (partnerId.isNotBlank()) {
+                    val partnerResult = getUserByIdUseCase(partnerId)
+                    partnerResult.onSuccess { user ->
+                        _state.update { it.copy(opponentName = user?.username ?: "Неизвестный") }
+                    }
                 }
 
-                if (myUserId.isBlank()) return@onEach
 
                 val isOpponentTyping = chat.typing.entries.any { (userId, isTyping) ->
-                    userId != myUserId && isTyping
+                    userId != myId && isTyping
                 }
                 _state.update { it.copy(isOpponentTyping = isOpponentTyping) }
             }
@@ -91,27 +103,41 @@ class ChatDetailViewModel @Inject constructor(
             }
             .onEach { messages ->
                 _state.update {
-                    // FIX: Исправил message -> messages (проверь название в State!)
                     it.copy(isLoading = false, messages = messages)
                 }
+                markUnreadMessagesAsRead(messages)
             }
             .launchIn(viewModelScope)
     }
+    private fun markUnreadMessagesAsRead(messages: List<Message>) {
+        val myId = _state.value.currentUserId
+        if (myId.isBlank()) return
 
-    fun sendMessage() {
-        if (myUserId.isBlank()) return
-        if (messageText.isBlank()) return
+        val unreadMessages = messages.filter { message ->
+            message.senderId != myId && !message.isRead
+        }
 
-        val textToSend = messageText // Сохраняем текст для отправки
-        messageText = "" // FIX: Очищаем поле СРАЗУ, чтобы юзер не спамил
+        if (unreadMessages.isNotEmpty()) {
+            viewModelScope.launch {
+                unreadMessages.forEach { message ->
+                    markMessageAsReadUseCase(chatId, message.id)
+                }
+            }
+        }
+    }
+    private fun sendMessage() {
+        val currentState = _state.value
+        if (currentState.currentUserId.isBlank()) return
+        if (currentState.messageText.isBlank()) return
+        val textToSend = currentState.messageText
+
+        _state.update { it.copy(messageText = "") }
 
         viewModelScope.launch {
             try {
-                sendMessageUseCase(chatId = chatId, text = textToSend, userId = myUserId)
-                // Успех
+                sendMessageUseCase(chatId = chatId, text = textToSend, userId = currentState.currentUserId)
             } catch (e: Exception) {
-                _state.update { it.copy(error = "Не удалось отправить") }
-                messageText = textToSend // FIX: Если ошибка - возвращаем текст обратно
+                _state.update { it.copy(error = e.toString(), messageText = textToSend) }
             }
         }
     }
@@ -119,30 +145,60 @@ class ChatDetailViewModel @Inject constructor(
     fun handleIntent(intent: ChatDetailIntent) {
         when(intent) {
             is ChatDetailIntent.OnMessageTextChanged -> {
-                messageText = intent.text
+                _state.update { it.copy(messageText = intent.text) }
                 updateTypingStatus()
             }
             is ChatDetailIntent.OnSendClick -> {
                 sendMessage()
             }
             ChatDetailIntent.LoadMessages -> {
-                loadMessage(chatId) // FIX: Убрали TODO
+                loadMessage(chatId)
+            }
+            is ChatDetailIntent.OnImageSelected -> {
+                sendImage(intent.uri)
+            }
+            is ChatDetailIntent.OnDeleteMessage -> {
+                deleteMessage(intent.messageId)
             }
         }
     }
-
+    private fun sendImage(uri: Uri) {
+        viewModelScope.launch {
+            sendImageMessageUseCase(chatId, uri)
+                .onFailure { e ->
+                    _state.update { it.copy(error = "Не удалось отправить фото: ${e.message}") }
+                }
+        }
+    }
+    private fun deleteMessage(messageId: String) {
+        viewModelScope.launch {
+            deleteMessageUseCase(chatId, messageId).onFailure { e ->
+                _state.update { it.copy(error = "Ошибка удаления: ${e.message}") }
+            }
+        }
+    }
     private fun updateTypingStatus() {
-
         if (typingJob == null) {
-            viewModelScope.launch {
+            viewModelScope.launch(Dispatchers.IO) {
                 setTypingStatusUseCase(chatId, true)
             }
         }
         typingJob?.cancel()
-        typingJob = viewModelScope.launch {
-            delay(3000)
+
+        typingJob = viewModelScope.launch(Dispatchers.IO) {
+            try {
+                delay(3000)
+                setTypingStatusUseCase(chatId, false)
+                typingJob = null
+            } catch (e: CancellationException) {
+                throw e
+            }
+        }
+    }
+    override fun onCleared() {
+        super.onCleared()
+        viewModelScope.launch(Dispatchers.IO + NonCancellable) {
             setTypingStatusUseCase(chatId, false)
-            typingJob = null
         }
     }
 }

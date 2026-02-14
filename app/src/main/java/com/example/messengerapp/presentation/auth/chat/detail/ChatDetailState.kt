@@ -6,7 +6,8 @@ data class ChatDetailState (
     val messages:List<Message> = emptyList(),
     val error:String? = null,
     val isLoading: Boolean = false,
-    val newMessageText:String = "",
+    val messageText:String = "",
     val currentUserId: String = "",
     val isOpponentTyping: Boolean = false,
+    val opponentName: String = "Загрузка..."
 )

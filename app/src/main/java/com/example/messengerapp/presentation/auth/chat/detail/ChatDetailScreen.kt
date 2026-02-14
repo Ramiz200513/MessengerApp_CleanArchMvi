@@ -1,5 +1,13 @@
 package com.example.messengerapp.presentation.auth.chat.detail
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -8,7 +16,9 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -18,10 +28,11 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
@@ -32,31 +43,51 @@ import com.example.messengerapp.presentation.auth.chat.detail.messageBubble.Mess
 @Composable
 fun ChatDetailScreen(
     navController: NavController,
-
-    chatId: String,
     viewModel: ChatDetailViewModel = hiltViewModel()
 ) {
+
+    val listState = rememberLazyListState()
     val state by viewModel.state.collectAsState()
-
-
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+        onResult = { uri ->
+            if (uri != null) {
+                viewModel.handleIntent(ChatDetailIntent.OnImageSelected(uri))
+            }
+        }
+    )
+    LaunchedEffect(state.messages.size) {
+        if (state.messages.isNotEmpty()) {
+            listState.animateScrollToItem(0) // 0, так как у нас reverseLayout = true
+        }
+    }
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     Column {
-                        Text("Чат..")
+                        Text(state.opponentName,
+                            fontWeight = FontWeight.Bold,)
                         if (state.isOpponentTyping) {
-                            Text(
-                                "печатает...",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.primary
-                            )
+                            AnimatedVisibility(
+                                visible = state.isOpponentTyping,
+                                enter = fadeIn() + expandVertically(),
+                                exit = fadeOut() + shrinkVertically()
+
+                            ) {
+                                Text(
+                                    "печатает...",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+
                         }
                     }
                 },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 }
             )
@@ -71,6 +102,7 @@ fun ChatDetailScreen(
                 .imePadding()
         ) {
             LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth(),
@@ -80,7 +112,9 @@ fun ChatDetailScreen(
                 items(state.messages) { message ->
                     MessageBubble(
                         message = message,
-                        isOwnMessage = message.senderId == state.currentUserId
+                        isOwnMessage = message.senderId == state.currentUserId,
+                        modifier = Modifier.animateItem(),
+                        onDeleteClick = { viewModel.handleIntent(ChatDetailIntent.OnDeleteMessage(message.id))}
                     )
                 }
             }
@@ -89,23 +123,27 @@ fun ChatDetailScreen(
 
 
             MessageInput(
-                text = viewModel.messageText,
+                text = state.messageText,
                 onTextChange = {
                     viewModel.handleIntent(ChatDetailIntent.OnMessageTextChanged(it))
                 },
                 onSendClick = {
                     viewModel.handleIntent(ChatDetailIntent.OnSendClick)
                 },
+                onAttachClick = {
+                    imagePickerLauncher.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                    )
+                }
             )
-        }
-
-        // ОШИБКИ
-        if (state.error != null) {
-            Text(
-                text = state.error!!,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(8.dp)
-            )
+            if (state.error != null) {
+                Text(
+                    text = state.error!!,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(8.dp)
+                )
+            }
         }
     }
 }
+
