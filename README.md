@@ -59,6 +59,11 @@ To build and run this project, you need to:
     * This app uses a custom `FcmKeyStore` object to handle OAuth2 signing for notifications.
     * You must generate a **Service Account Key** in the Firebase Console and add it to `data/.../FcmKeyStore.kt`.
 
+ ## 👨‍💻 Author
+**Ramiz Galiakberov**
+* Android Developer
+* Astana, Kazakhstan
+
 ```kotlin
 // Example of the protected FcmKeyStore object (Ignored by Git)
 object FcmKeyStore {
@@ -71,7 +76,4 @@ object FcmKeyStore {
     """
 }
 
- ## 👨‍💻 Author
-**Ramiz Galiakberov**
-* Android Developer
-* Astana, Kazakhstan
+
