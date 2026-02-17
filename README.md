@@ -70,3 +70,8 @@ object FcmKeyStore {
     }
     """
 }
+
+ ## 👨‍💻 Author
+**Ramiz Galiakberov**
+* Android Developer
+* Astana, Kazakhstan
