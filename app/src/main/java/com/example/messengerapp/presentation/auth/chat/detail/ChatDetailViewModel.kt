@@ -75,12 +75,20 @@ class ChatDetailViewModel @Inject constructor(
                 if (myId.isBlank()) return@onEach
                 val partnerId = chat.participants.firstOrNull { it != myId } ?: ""
 
+
+
                 if (partnerId.isNotBlank()) {
                     val partnerResult = getUserByIdUseCase(partnerId)
                     partnerResult.onSuccess { user ->
-                        _state.update { it.copy(opponentName = user?.username ?: "Неизвестный") }
+                        _state.update {
+                            it.copy(
+                                opponentName = user?.username ?: "Неизвестный",
+                                opponentImage = user?.photoUrl
+                            )
+                        }
                     }
                 }
+
 
 
                 val isOpponentTyping = chat.typing.entries.any { (userId, isTyping) ->
