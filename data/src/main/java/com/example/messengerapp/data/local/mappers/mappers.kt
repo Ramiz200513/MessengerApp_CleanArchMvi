@@ -13,7 +13,8 @@ fun UserEntity.toDomain(): User {
         id = id,
         username = username,
         photoUrl = photoUrl,
-        online = online
+        online = online,
+        fcmToken = fcmToken
     )
 }
 
@@ -23,6 +24,7 @@ fun User.toEntity(): UserEntity{
         username = username,
         photoUrl = photoUrl,
         online = online,
+        fcmToken = fcmToken,
     )
 }
 fun ChatEntity.toDomain(): Chat{

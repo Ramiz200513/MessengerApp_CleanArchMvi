@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -21,38 +22,34 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MessageInput(
     text: String,
     onTextChange: (String) -> Unit,
     onSendClick: () -> Unit,
-    modifier: Modifier,
-    ) {
+    onAttachClick: () -> Unit
+) {
     Row(
-        modifier = Modifier.fillMaxWidth()
-            .padding(8.dp, top = 10.dp),
-        verticalAlignment = Alignment.Bottom,
-        horizontalArrangement =Arrangement.Center
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(8.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
+
+        IconButton(onClick = onAttachClick) {
+            Icon(Icons.Default.Add, contentDescription = "Прикрепить фото")
+        }
+
         OutlinedTextField(
             value = text,
             onValueChange = onTextChange,
             modifier = Modifier.weight(1f),
-            placeholder = { Text(text = "Сообщение...") },
-            shape = RoundedCornerShape(24.dp),
+            placeholder = { Text("Сообщение...") },
             maxLines = 3
         )
-        Spacer(modifier = Modifier.width(8.dp))
-        IconButton(
-            onClick = onSendClick,
-            enabled = text.isNotBlank()
-        ) {
-            Icon(
-                imageVector = Icons.Default.Send,
-                contentDescription = "Send",
-                tint = MaterialTheme.colorScheme.primary
-            )
+
+        IconButton(onClick = onSendClick, enabled = text.isNotBlank()) {
+            Icon(Icons.Default.Send, contentDescription = "Отправить")
         }
     }
 }

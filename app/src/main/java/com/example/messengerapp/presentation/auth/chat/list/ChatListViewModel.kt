@@ -1,5 +1,6 @@
 package com.example.messengerapp.presentation.auth.chat.list
 
+import android.util.Log.e
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -14,6 +15,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -21,7 +23,7 @@ import javax.inject.Inject
 class ChatListViewModel @Inject constructor(
     private val getChatsUseCase: GetMyChatsUseCase
 ): ViewModel() {
-    private val _state = MutableStateFlow<ChatListState>(ChatListState())
+    private val _state = MutableStateFlow(ChatListState())
     val state = _state.asStateFlow()
     init {
         loadChats()
@@ -29,15 +31,14 @@ class ChatListViewModel @Inject constructor(
     fun loadChats(){
         getChatsUseCase()
             .onStart {
-                _state.value = _state.value.copy(isLoading = true, error = null)
+                _state.update {it.copy(isLoading = true)}
             }
             .catch { exception ->
                 _state.value = _state.value.copy(
                     isLoading = false,
                     error = exception.message ?: "Что-то пошло не так" )}
             .onEach { list->
-                _state.value = _state.value.copy(isLoading = false,
-                    chats = list)
+                _state.update { it.copy(isLoading = false, chats = list) }
             }
             .launchIn(viewModelScope)
     }

@@ -8,5 +8,6 @@ data class UserEntity(
     @PrimaryKey val id: String,
     val username: String,
     val photoUrl: String?,
-    val online: Boolean
+    val online: Boolean,
+    val fcmToken: String?
 )

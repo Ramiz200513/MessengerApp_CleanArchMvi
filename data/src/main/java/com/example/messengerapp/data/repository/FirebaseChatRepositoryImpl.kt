@@ -1,6 +1,7 @@
 package com.example.messengerapp.data.repository
 
 import android.net.Uri
+import android.util.Log
 import com.example.domain.domain.model.Chat
 import com.example.domain.domain.model.ChatWithMessages
 import com.example.domain.domain.model.Message
@@ -10,6 +11,11 @@ import com.example.messengerapp.data.local.dao.MessageDao
 import com.example.messengerapp.data.local.entities.ChatEntity
 import com.example.messengerapp.data.local.mappers.toDomain
 import com.example.messengerapp.data.local.mappers.toEntity
+import com.example.messengerapp.data.network.FcmApi
+import com.example.messengerapp.data.network.FcmMessage
+import com.example.messengerapp.data.network.FcmNotification
+import com.example.messengerapp.data.network.FcmTokenManager
+import com.example.messengerapp.data.network.FcmV1Request
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
@@ -28,24 +34,74 @@ class FirebaseChatRepositoryImpl @Inject constructor(
     private val auth: FirebaseAuth,
     private val chatDao: ChatDao,
     private val messageDao: MessageDao,
-    private val storage: FirebaseStorage
+    private val storage: FirebaseStorage,
+    private val fcmApi: FcmApi
 ) : ChatRepository {
-    override suspend fun sendMessage(chatId: String, message: Message){
+    override suspend fun sendMessage(chatId: String, message: Message) {
+        val currentUserId = auth.currentUser?.uid ?: return
+
         val messageToSend = message.copy(
             timestamp = System.currentTimeMillis()
         )
+
         val entity = messageToSend.toEntity().copy(chatId = chatId)
         messageDao.upsertMessages(listOf(entity))
+
         firestore.collection("chats")
             .document(chatId)
             .collection("messages")
             .document(message.id)
             .set(messageToSend)
             .await()
+
         firestore.collection("chats").document(chatId)
             .update("lastModified", System.currentTimeMillis())
-    }
 
+        try {
+            val receiverToken = fetchReceiverToken(chatId, currentUserId)
+            if (!receiverToken.isNullOrBlank()) {
+                val accessToken = FcmTokenManager.getAccessToken()
+                val request = FcmV1Request(
+                    message = FcmMessage(
+                        token = receiverToken,
+                        notification = FcmNotification(
+                            title = "Новое сообщение",
+                            body = message.text ?: "Отправил фото"
+                        )
+                    )
+                )
+
+                // 3. Отправляем
+                val response = fcmApi.sendNotification(accessToken, request)
+
+                if (!response.isSuccessful) {
+                    Log.e("FCM_V1", "Error: ${response.code()} ${response.errorBody()?.string()}")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("FCM_V1", "Failed to send notification", e)
+        }
+    }
+    private suspend fun fetchReceiverToken(chatId: String, myId: String): String? {
+        return try {
+            val chatDoc = firestore.collection("chats").document(chatId).get().await()
+
+            // Безопасно достаем список участников
+            val participants = chatDoc.get("participants") as? List<*>
+            val participantsIds = participants?.filterIsInstance<String>() ?: return null
+
+            // Находим ID оппонента
+            val receiverId = participantsIds.firstOrNull { it != myId } ?: return null
+
+            // Достаем его токен
+            val userDoc = firestore.collection("users").document(receiverId).get().await()
+
+            // Возвращаем строку (она может быть null, если поля нет в базе)
+            userDoc.getString("fcmToken")
+        } catch (e: Exception) {
+            null
+        }
+    }
     override fun getChats(): Flow<List<Chat>> {
         return channelFlow {
             val currentUserId = auth.currentUser?.uid

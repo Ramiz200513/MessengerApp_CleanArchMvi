@@ -22,7 +22,6 @@ class RegistrationViewModel @Inject constructor(
     private val _state = MutableStateFlow(RegistrationState())
     val state = _state.asStateFlow()
 
-    // В RegistrationViewModel:
     var usernameInput by mutableStateOf("")
     var emailInput by mutableStateOf("")
     var passwordInput by mutableStateOf("")

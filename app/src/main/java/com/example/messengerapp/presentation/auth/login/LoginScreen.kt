@@ -29,7 +29,9 @@ fun LoginScreen(
 
     LaunchedEffect(state) {
         if (state.isSuccess) {
-            navController.navigate("chat_list") // Раскомментируешь, когда будет экран чатов
+            navController.navigate("chat_list"){
+                popUpTo("login") { inclusive = true }
+            }
         }
 
         if (state.error != null) {
@@ -54,7 +56,7 @@ fun LoginScreen(
                 Spacer(modifier = Modifier.height(32.dp))
 
                 OutlinedTextField(
-                    value = viewModel.emailInput,
+                    value = state.text,
                     onValueChange = { viewModel.handleIntent(LoginIntent.OnEmailChanged(it)) },
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text("Email") },
@@ -72,7 +74,7 @@ fun LoginScreen(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 OutlinedTextField(
-                    value = viewModel.passwordInput,
+                    value = state.password,
                     onValueChange = { viewModel.handleIntent(LoginIntent.OnPaswwordChanged(it)) },
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text("Пароль") }, // Исправил label

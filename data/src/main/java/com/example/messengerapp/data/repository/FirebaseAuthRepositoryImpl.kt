@@ -49,7 +49,7 @@ class FirebaseAuthRepositoryImpl @Inject constructor(
                 username = username,
                 email = email,
                 photoUrl = null,
-                isOnline = true
+                online = true
             )
             firestore.collection("users").document(uid)
                 .set(newUser)

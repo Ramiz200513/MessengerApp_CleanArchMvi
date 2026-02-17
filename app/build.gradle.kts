@@ -5,12 +5,21 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.kotlin.serialization)
     id("com.google.gms.google-services")
+    kotlin("kapt")
 }
 
 android {
     namespace = "com.example.messengerapp"
     compileSdk = 35
+    packaging {
+        resources {
 
+            excludes += "/META-INF/INDEX.LIST"
+
+            excludes += "/META-INF/DEPENDENCIES"
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+    }
     defaultConfig {
         applicationId = "com.example.messengerapp"
         minSdk = 26
@@ -54,23 +63,32 @@ android {
 }
 
 dependencies {
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
+    implementation("com.google.firebase:firebase-storage")
+    implementation("io.coil-kt:coil-compose:2.5.0")
+    implementation("com.google.firebase:firebase-messaging-ktx")
     implementation(project(":domain"))
     implementation(project(":core"))
     implementation(project(":data"))
+    implementation("com.jakewharton.retrofit:retrofit2-kotlinx-serialization-converter:1.0.0")
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.11.0")
+    kapt("androidx.room:room-compiler:2.6.1")
+    implementation("androidx.room:room-runtime:2.6.1")
+    implementation("androidx.room:room-ktx:2.6.1")
 
-    // Core
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
 
-    // Compose (Имена теперь точно совпадают с TOML)
+
     implementation(platform(libs.androidx.compose.bom))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
 
-    // Hilt
+
     implementation(libs.hilt.android)
     implementation(libs.androidx.lifecycle.viewmodel.savedstate.android)
     implementation(platform("com.google.firebase:firebase-bom:33.1.2"))
@@ -88,7 +106,7 @@ dependencies {
     implementation(platform("androidx.compose:compose-bom:2024.09.01"))
     val composeBom = platform(libs.androidx.compose.bom)
     implementation(composeBom)
-    androidTestImplementation(composeBom) // ВАЖНО: для тестов тоже нужен BOM!
+    androidTestImplementation(composeBom)
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)

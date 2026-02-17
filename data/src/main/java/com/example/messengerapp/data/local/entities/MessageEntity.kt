@@ -7,8 +7,9 @@ import androidx.room.PrimaryKey
 data class MessageEntity (
     @PrimaryKey val id: String,
     val chatId: String,
-    val text: String,
+    val text: String?,
     val senderId: String,
     val timestamp: Long,
-    val isRead: Boolean = false
+    val isRead: Boolean ,
+    val imageUrl: String? = null
 )

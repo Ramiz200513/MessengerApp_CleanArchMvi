@@ -1,7 +1,8 @@
 package com.example.domain.domain.model
 
-data class ChatWithPartner (
+data class ChatWithPartner(
     val chat: Chat,
-    val partnerName: String,
-    val partnerId: String
+    val partner: User?,
+    val lastMessage: String = "Нет сообщений",
+    val lastMessageTime: Long = 0L
 )

@@ -21,6 +21,7 @@ material = "1.11.0"
 lifecycleViewmodelSavedstateAndroid = "2.10.0"
 firebaseAuthKtx = "24.0.1"
 material3 = "1.4.0"
+firebaseDatabaseKtx = "22.0.1"
 
 [libraries]
 # Android Core
@@ -57,6 +58,7 @@ retrofit-serialization-converter = { group = "com.jakewharton.retrofit", name = 
 androidx-lifecycle-viewmodel-savedstate-android = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-savedstate-android", version.ref = "lifecycleViewmodelSavedstateAndroid" }
 firebase-auth-ktx = { group = "com.google.firebase", name = "firebase-auth-ktx", version.ref = "firebaseAuthKtx" }
 androidx-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "material3" }
+firebase-database-ktx = { group = "com.google.firebase", name = "firebase-database-ktx", version.ref = "firebaseDatabaseKtx" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
