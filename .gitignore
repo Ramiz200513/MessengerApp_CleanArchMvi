@@ -13,3 +13,10 @@
 .externalNativeBuild
 .cxx
 local.properties
+google-services.json
+GoogleService-Info.plist
+*.jks
+*.keystore
+service-account.json
+credentials.json
+**/FcmKeyStore.kt

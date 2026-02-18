@@ -15,6 +15,7 @@ class SendMessageUseCase @Inject constructor(
             senderId = userId,
             timestamp = System.currentTimeMillis(),
             isRead = false,
+            imageUrl = null,
         )
         repository.sendMessage(chatId, message)
     }

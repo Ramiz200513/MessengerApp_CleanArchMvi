@@ -27,10 +27,11 @@ sealed class Screen(val route: String) {
 }
 @Composable
 fun AppNavGraph(
-    navController: NavHostController
+    navController: NavHostController,
+    startDestination: String
 ){
     NavHost(navController = navController,
-        startDestination = Screen.Login.route){
+        startDestination = startDestination){
         composable(Screen.Login.route) {
             LoginScreen(navController = navController)
         }
@@ -47,7 +48,7 @@ fun AppNavGraph(
             )
         ) { backStackEntry ->
             val chatId = backStackEntry.arguments?.getString("chatId") ?: ""
-            ChatDetailScreen(navController = navController, chatId = chatId)
+            ChatDetailScreen(navController = navController)
         }
         composable(route = Screen.Profile.route){
             ProfileScreen(navController)

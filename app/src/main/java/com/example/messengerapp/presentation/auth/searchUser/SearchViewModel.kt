@@ -42,7 +42,6 @@ class SearchViewModel @Inject constructor(
                 if(user !=null){
                     _state.update { it.copy(isLoading = false, foundUser = user) }
                 } else {
-                    // Запрос успешен, но юзера нет
                     _state.update { it.copy(isLoading = false, error = "Пользователь не найден") }
                 }
             }

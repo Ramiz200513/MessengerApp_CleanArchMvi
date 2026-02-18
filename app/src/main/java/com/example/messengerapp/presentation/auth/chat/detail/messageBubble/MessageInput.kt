@@ -1,25 +1,17 @@
 package com.example.messengerapp.presentation.auth.chat.detail.messageBubble
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Send
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -27,31 +19,56 @@ fun MessageInput(
     text: String,
     onTextChange: (String) -> Unit,
     onSendClick: () -> Unit,
-    modifier: Modifier,
-    ) {
+    onAttachClick: () -> Unit
+) {
     Row(
-        modifier = Modifier.fillMaxWidth()
-            .padding(8.dp, top = 10.dp),
-        verticalAlignment = Alignment.Bottom,
-        horizontalArrangement =Arrangement.Center
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(8.dp)
+            .background(MaterialTheme.colorScheme.surface),
+        verticalAlignment = Alignment.CenterVertically
     ) {
+
+        IconButton(onClick = onAttachClick) {
+            Icon(
+                Icons.Default.AttachFile,
+                contentDescription = "Attach",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+
         OutlinedTextField(
             value = text,
             onValueChange = onTextChange,
-            modifier = Modifier.weight(1f),
-            placeholder = { Text(text = "Сообщение...") },
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 4.dp),
+            placeholder = { Text("Сообщение") },
+            maxLines = 4,
             shape = RoundedCornerShape(24.dp),
-            maxLines = 3
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = Color.LightGray,
+                focusedContainerColor = MaterialTheme.colorScheme.surface,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surface
+            )
         )
-        Spacer(modifier = Modifier.width(8.dp))
+
+        val isEnabled = text.isNotBlank()
+        val btnColor = if (isEnabled) MaterialTheme.colorScheme.primary else Color.LightGray
+
         IconButton(
             onClick = onSendClick,
-            enabled = text.isNotBlank()
+            enabled = isEnabled,
+            modifier = Modifier
+                .padding(start = 4.dp)
+                .background(Color.Transparent)
         ) {
             Icon(
-                imageVector = Icons.Default.Send,
+                imageVector = Icons.AutoMirrored.Filled.Send,
                 contentDescription = "Send",
-                tint = MaterialTheme.colorScheme.primary
+                tint = btnColor
             )
         }
     }

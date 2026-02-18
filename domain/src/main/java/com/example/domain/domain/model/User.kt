@@ -8,5 +8,6 @@ data class User(
     val username: String = "",
     val email: String = "",
     val photoUrl: String? = null,
-    val isOnline: Boolean = false
+    var online: Boolean = false,
+    val fcmToken: String? = null
 )
