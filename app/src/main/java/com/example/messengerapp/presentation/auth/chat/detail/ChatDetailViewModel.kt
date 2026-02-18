@@ -77,7 +77,7 @@ class ChatDetailViewModel @Inject constructor(
 
 
 
-                if (partnerId.isNotBlank()) {
+                if (partnerId.isNotBlank()) {//
                     val partnerResult = getUserByIdUseCase(partnerId)
                     partnerResult.onSuccess { user ->
                         _state.update {

@@ -107,7 +107,7 @@ fun ChatDetailScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
                 .imePadding()
-        ) {
+        ) {//
 
             LazyColumn(
                 state = listState,

@@ -15,7 +15,7 @@ import androidx.navigation.compose.rememberNavController
 import com.example.messengerapp.navigation.AppNavGraph
 import com.example.messengerapp.ui.theme.MessengerAppTheme
 import dagger.hilt.android.AndroidEntryPoint
-import java.util.jar.Manifest
+
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -28,9 +28,9 @@ class MainActivity : ComponentActivity() {
             MessengerAppTheme {
                 val permissionLauncher = rememberLauncherForActivityResult(
                     ActivityResultContracts.RequestPermission()
-                ){ isGranted->
+                ){
                     viewModel.fetchAndSaveFcmToken()
-                }
+                }//
                 LaunchedEffect(Unit ) {
                     if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU){
                         permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)

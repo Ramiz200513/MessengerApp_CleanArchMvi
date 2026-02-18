@@ -2,7 +2,7 @@ package com.example.messengerapp.data.network
 
 import android.annotation.SuppressLint
 import kotlinx.serialization.Serializable
-
+//
 @SuppressLint("UnsafeOptInUsageError")
 @Serializable
 data class FcmV1Request(

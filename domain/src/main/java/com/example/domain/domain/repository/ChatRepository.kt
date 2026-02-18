@@ -16,5 +16,5 @@ interface ChatRepository {
     fun getChatsWithMessages(): Flow<List<ChatWithMessages>>
     suspend fun sendImageMessage(chatId:String,image: Uri):Result<Unit>
     suspend fun deleteMessage(chatId: String,messageId: String):Result<Unit>
-    suspend fun markMessageAsRead(chatId:String,messageId: String)
+    suspend fun markMessageAsRead(chatId:String,messageId: String) //
 }

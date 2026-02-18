@@ -9,4 +9,4 @@ class UpdateFcmTokenUseCase @Inject constructor(
     suspend operator fun invoke(token: String) {
         repository.updateFcmToken(token)
     }
-}
+}//

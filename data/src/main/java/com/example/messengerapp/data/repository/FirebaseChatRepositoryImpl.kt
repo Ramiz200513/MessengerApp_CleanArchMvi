@@ -71,7 +71,6 @@ class FirebaseChatRepositoryImpl @Inject constructor(
                     )
                 )
 
-                // 3. Отправляем
                 val response = fcmApi.sendNotification(accessToken, request)
 
                 if (!response.isSuccessful) {
@@ -86,19 +85,12 @@ class FirebaseChatRepositoryImpl @Inject constructor(
         return try {
             val chatDoc = firestore.collection("chats").document(chatId).get().await()
 
-            // Безопасно достаем список участников
             val participants = chatDoc.get("participants") as? List<*>
             val participantsIds = participants?.filterIsInstance<String>() ?: return null
-
-            // Находим ID оппонента
             val receiverId = participantsIds.firstOrNull { it != myId } ?: return null
-
-            // Достаем его токен
             val userDoc = firestore.collection("users").document(receiverId).get().await()
-
-            // Возвращаем строку (она может быть null, если поля нет в базе)
             userDoc.getString("fcmToken")
-        } catch (e: Exception) {
+        } catch (_:Exception) {
             null
         }
     }

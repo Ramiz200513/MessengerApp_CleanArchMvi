@@ -114,7 +114,7 @@ fun MessageBubble(
             }
         }
 
-        DropdownMenu(
+        DropdownMenu(  //
             expanded = showMenu,
             onDismissRequest = { showMenu = false },
             modifier = Modifier.background(MaterialTheme.colorScheme.surface)
