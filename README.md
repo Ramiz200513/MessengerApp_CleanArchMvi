@@ -25,7 +25,7 @@ A modern Android messaging application built with **Clean Architecture** and **O
 * **Network:** Retrofit 2, OkHttp, Gson.
 * **Local Storage:** Room Database (SQLite).
 * **Remote Data:** Firebase Firestore, Firebase Storage.
-* **UI:** XML Layouts, ViewBinding, Material Design 3.
+* **UI:** Jetpack compose, Material Design 3.
 * **Images:** Coil (Coroutines Image Loading).
 
 ## 🏗 Architecture Overview
