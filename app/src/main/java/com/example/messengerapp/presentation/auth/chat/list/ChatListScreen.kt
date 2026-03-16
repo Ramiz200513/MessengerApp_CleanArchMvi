@@ -40,7 +40,7 @@ fun ChatListScreen(
                     )
                 },
                 actions = {
-                    IconButton(onClick = { navController.navigate(Screen.Profile.route) }) {
+                    IconButton(onClick = { navController.navigate(Screen.Profile.createRoute("me")) }) {
                         Icon(
                             imageVector = Icons.Default.Person,
                             contentDescription = "Профиль",
@@ -100,11 +100,23 @@ fun ChatListScreen(
                 }
             } else {
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
-                    items(state.chats, key = { it.chat.id }) { chatWithPartner ->
+                    items(
+                        items = state.chats,
+                        key = { "${it.chat.id}_${it.chat.isFavorite}_${it.hasUnreadMessages}" }
+                    ) { chatWithPartner ->
                         ChatItem(
                             item = chatWithPartner,
                             onClick = {
                                 navController.navigate(Screen.ChatDetail.createRoute(chatWithPartner.chat.id))
+                            },
+                            onFavoriteClick = {
+                                viewModel.handleIntent(ChatListIntent.ToggleFavorite(chatWithPartner.chat.id))
+                            },
+                            onAvatarClick = {
+
+                                chatWithPartner.partner?.id?.let { partnerId ->
+                                    navController.navigate(Screen.Profile.createRoute(partnerId))
+                                }
                             }
                         )
                     }

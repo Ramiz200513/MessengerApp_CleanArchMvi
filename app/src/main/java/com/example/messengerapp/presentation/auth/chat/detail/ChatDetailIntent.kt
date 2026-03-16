@@ -8,4 +8,5 @@ sealed class ChatDetailIntent {
     object LoadMessages: ChatDetailIntent()
     data class OnImageSelected(val uri: Uri) : ChatDetailIntent()//
     data class OnDeleteMessage(val messageId: String) : ChatDetailIntent()
+    data class OnVideoSelected(val uri:Uri): ChatDetailIntent()
 }

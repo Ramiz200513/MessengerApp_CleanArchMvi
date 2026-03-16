@@ -10,5 +10,6 @@ data class ChatDetailState(
     val currentUserId: String = "",
     val opponentName: String = "",
     val opponentImage: String? = null,
-    val isOpponentTyping: Boolean = false
+    val isOpponentTyping: Boolean = false,
+    val fullscreenImageUrl:String? = null
 )
