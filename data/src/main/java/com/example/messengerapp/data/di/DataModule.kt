@@ -111,12 +111,9 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideFcmApi(): FcmApi {
-        // 1. Создаем логгер
         val logging = okhttp3.logging.HttpLoggingInterceptor().apply {
             level = okhttp3.logging.HttpLoggingInterceptor.Level.BODY
         }
-
-        // 2. Создаем клиент с логгером
         val client = okhttp3.OkHttpClient.Builder()
             .addInterceptor(logging)
             .build()
@@ -129,7 +126,7 @@ object NetworkModule {
 
         return Retrofit.Builder()
             .baseUrl("https://fcm.googleapis.com/")
-            .client(client) // <--- Добавляем клиент
+            .client(client)
             .addConverterFactory(json.asConverterFactory(contentType))
             .build()
             .create(FcmApi::class.java)

@@ -74,9 +74,6 @@ class ChatDetailViewModel @Inject constructor(
                 val myId = _state.value.currentUserId
                 if (myId.isBlank()) return@onEach
                 val partnerId = chat.participants.firstOrNull { it != myId } ?: ""
-
-
-
                 if (partnerId.isNotBlank()) {//
                     val partnerResult = getUserByIdUseCase(partnerId)
                     partnerResult.onSuccess { user ->
@@ -88,8 +85,6 @@ class ChatDetailViewModel @Inject constructor(
                         }
                     }
                 }
-
-
 
                 val isOpponentTyping = chat.typing.entries.any { (userId, isTyping) ->
                     userId != myId && isTyping

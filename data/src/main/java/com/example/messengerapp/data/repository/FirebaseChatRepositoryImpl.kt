@@ -19,6 +19,7 @@ import com.example.messengerapp.data.network.FcmV1Request
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
+import com.google.firebase.firestore.SetOptions
 import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -111,7 +112,10 @@ class FirebaseChatRepositoryImpl @Inject constructor(
                         }
                         if (snapshot != null) {
                             val chats = snapshot.documents.mapNotNull { doc ->
-                                doc.toObject(Chat::class.java)?.copy(id = doc.id)
+                                doc.toObject(Chat::class.java)?.copy(
+                                    id = doc.id,
+                                    isFavorite = doc.getBoolean("isFavorite") ?: false
+                                )
                             }
                             launch {
                                 chatDao.upsertChats(chats.map { it.toEntity() })
@@ -212,7 +216,8 @@ class FirebaseChatRepositoryImpl @Inject constructor(
             val newChatEntity = ChatEntity(
                 id = newChatId,
                 lastModified = System.currentTimeMillis(),
-                participantsCsv = listOf(currentUserId,otherUserId).joinToString(",")
+                participantsCsv = listOf(currentUserId,otherUserId).joinToString(","),
+                isFavorite = false
             )
             chatDao.upsertChats(listOf(newChatEntity))
             Result.success(documentReference.id)
@@ -278,10 +283,46 @@ class FirebaseChatRepositoryImpl @Inject constructor(
 
                         if (snapshot != null) {
                             val chats = snapshot.documents.mapNotNull { doc ->
-                                doc.toObject(Chat::class.java)?.copy(id = doc.id)
+                                doc.toObject(Chat::class.java)?.copy(
+                                    id = doc.id,
+                                    isFavorite = doc.getBoolean("isFavorite") ?: false
+                                )
                             }
+
                             launch {
+                                // 1. Сохраняем обновленные чаты в Room
                                 chatDao.upsertChats(chats.map { it.toEntity() })
+
+                                // 2. ФИКС: Для каждого чата запрашиваем 1 последнее сообщение
+                                chats.forEach { chat ->
+                                    try {
+                                        val msgsSnapshot = firestore.collection("chats")
+                                            .document(chat.id)
+                                            .collection("messages")
+                                            .orderBy("timestamp", Query.Direction.DESCENDING)
+                                            .limit(1)
+                                            .get()
+                                            .await()
+
+                                        val msgDoc = msgsSnapshot.documents.firstOrNull()
+                                        if (msgDoc != null) {
+                                            val lastMessage = Message(
+                                                id = msgDoc.id,
+                                                text = msgDoc.getString("text"),
+                                                imageUrl = msgDoc.getString("imageUrl"),
+                                                senderId = msgDoc.getString("senderId") ?: "",
+                                                timestamp = msgDoc.getLong("timestamp") ?: 0L,
+                                                isRead = msgDoc.getBoolean("isRead") ?: false
+                                            )
+
+                                            // 3. Сохраняем это сообщение в Room
+                                            val messageEntity = lastMessage.toEntity().copy(chatId = chat.id)
+                                            messageDao.upsertMessages(listOf(messageEntity))
+                                        }
+                                    } catch (e: Exception) {
+                                        e.printStackTrace()
+                                    }
+                                }
                             }
                         }
                     }
@@ -347,6 +388,23 @@ class FirebaseChatRepositoryImpl @Inject constructor(
                 .collection("messages")
                 .document(messageId)
                 .update("isRead", true)
+                .await()
+
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    override suspend fun markAsFavorite(chatId: String) {
+        try {
+            val chat = chatDao.getChatOneShot(chatId) ?: return
+            val newStatus = !chat.isFavorite
+
+
+            chatDao.updateFavoriteStatus(chatId, newStatus)
+            firestore.collection("chats")
+                .document(chatId)
+                .set(mapOf("isFavorite" to newStatus), SetOptions.merge())
                 .await()
 
         } catch (e: Exception) {

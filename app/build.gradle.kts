@@ -53,7 +53,7 @@ android {
         compose = true
     }
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.8" // Или соответствующая твоему Kotlin
+        kotlinCompilerExtensionVersion = "1.5.8"
     }
     packaging {
         resources {

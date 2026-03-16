@@ -1,9 +1,11 @@
 package com.example.messengerapp.data.local.dao
 
 import androidx.room.Dao
+import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Upsert
+import com.example.domain.domain.model.Chat
 import com.example.messengerapp.data.local.entities.ChatEntity
 import com.example.messengerapp.data.local.entities.ChatWithLastMessage
 import com.example.messengerapp.data.local.entities.ChatWithPartnerEntity
@@ -19,10 +21,12 @@ interface ChatDao {
     suspend fun clearAll()
     @Query("SELECT * FROM CHATS ORDER BY lastModified Desc")
     suspend fun getChatsOneShot(): List<ChatEntity>
+    @Query("Select * from chats where id = :chatId")
+    suspend fun getChatOneShot(chatId: String): ChatEntity?
     @Transaction
     @Query("""
     SELECT * FROM chats 
-    ORDER BY lastModified DESC
+    Order By isFavorite Desc, lastModified DESC
 """)
     fun getChatsWithPartners(): Flow<List<ChatWithPartnerEntity>>
     @Transaction
@@ -31,4 +35,9 @@ interface ChatDao {
         ORDER BY lastModified Desc
     """)
     fun getChatsWithLastMessages(): Flow<List<ChatWithLastMessage>>
+    @Query("Select * from chats where isFavorite = 1 Order By lastModified Desc")
+    fun getFavorites():Flow<List<ChatEntity>>
+    @Query("Update chats Set isFavorite = :isFavorite where id =:chatId")
+    suspend fun updateFavoriteStatus(chatId:String,isFavorite: Boolean)
+
 }

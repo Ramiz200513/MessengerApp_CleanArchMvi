@@ -8,7 +8,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.messengerapp.data" // <-- ВАЖНО: убедись, что тут data
+    namespace = "com.example.messengerapp.data"
     compileSdk = 35
 
     defaultConfig {

@@ -31,14 +31,16 @@ fun ChatEntity.toDomain(): Chat{
     return Chat(
         id = id,
         lastModified = lastModified,
-        participants = participantsCsv.split(",").filter { it.isNotBlank() }
+        participants = participantsCsv.split(",").filter { it.isNotBlank() },
+        isFavorite = isFavorite
     )
 }
 fun Chat.toEntity(): ChatEntity {
     return ChatEntity(
         id = id,
         lastModified = lastModified,
-        participantsCsv = participants.joinToString(",")
+        participantsCsv = participants.joinToString(","),
+        isFavorite = isFavorite
     )
 }
 // MessageMappers.kt
