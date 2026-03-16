@@ -6,6 +6,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.VideoCall
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -19,7 +20,8 @@ fun MessageInput(
     text: String,
     onTextChange: (String) -> Unit,
     onSendClick: () -> Unit,
-    onAttachClick: () -> Unit
+    onAttachClick: () -> Unit,
+    onVideoClick: () -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -37,6 +39,13 @@ fun MessageInput(
             )
         }
 
+        IconButton(onClick = onVideoClick) {
+            Icon(
+                imageVector = Icons.Default.VideoCall,
+                contentDescription = "Видео",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
 
         OutlinedTextField(
             value = text,

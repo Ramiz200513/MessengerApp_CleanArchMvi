@@ -143,6 +143,7 @@ class FirebaseChatRepositoryImpl @Inject constructor(
                     send(entities.map { it.toDomain() })
                 }
             }
+
             val query = firestore.collection("chats")
                 .document(chatId)
                 .collection("messages")
@@ -158,6 +159,7 @@ class FirebaseChatRepositoryImpl @Inject constructor(
                             id = doc.id,
                             text = doc.getString("text"),
                             imageUrl = doc.getString("imageUrl"),
+                            videoUrl = doc.getString("videoUrl"),
                             senderId = doc.getString("senderId") ?: "",
                             timestamp = doc.getLong("timestamp") ?: 0L,
                             isRead = doc.getBoolean("isRead") ?: false
@@ -227,6 +229,32 @@ class FirebaseChatRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun sendVideoMessage(
+        chatId: String,
+        uri: Uri
+    ): Result<Unit> {
+        return try {
+            val currentId = auth.currentUser?.uid ?: throw Exception("Юзер не вошел в аккаунт!")
+            val videoId = UUID.randomUUID().toString()
+            val storageRef = storage.reference.child("chats/$chatId/videos/$videoId.mp4")
+            storageRef.putFile(uri).await()
+            val downloadUrl = storageRef.downloadUrl.await().toString()
+            val message = Message(
+                id = videoId,
+                text = "",
+                videoUrl = downloadUrl,
+                senderId = currentId,
+                timestamp = System.currentTimeMillis()
+            )
+            sendMessage(chatId, message)
+            Result.success(Unit)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Result.failure(e)
+        }
+        }
+
+
     override suspend fun setTypingStatus(chatId: String, isTyping: Boolean) {
         val currentUserId = auth.currentUser?.uid ?: return
         try {
@@ -290,10 +318,7 @@ class FirebaseChatRepositoryImpl @Inject constructor(
                             }
 
                             launch {
-                                // 1. Сохраняем обновленные чаты в Room
                                 chatDao.upsertChats(chats.map { it.toEntity() })
-
-                                // 2. ФИКС: Для каждого чата запрашиваем 1 последнее сообщение
                                 chats.forEach { chat ->
                                     try {
                                         val msgsSnapshot = firestore.collection("chats")
@@ -315,7 +340,6 @@ class FirebaseChatRepositoryImpl @Inject constructor(
                                                 isRead = msgDoc.getBoolean("isRead") ?: false
                                             )
 
-                                            // 3. Сохраняем это сообщение в Room
                                             val messageEntity = lastMessage.toEntity().copy(chatId = chat.id)
                                             messageDao.upsertMessages(listOf(messageEntity))
                                         }

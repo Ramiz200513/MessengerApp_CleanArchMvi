@@ -11,5 +11,6 @@ data class MessageEntity (
     val senderId: String,
     val timestamp: Long,
     val isRead: Boolean ,
-    val imageUrl: String? = null
+    val imageUrl: String? = null,
+    val videoUrl: String? = null
 )

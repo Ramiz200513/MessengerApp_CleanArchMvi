@@ -31,10 +31,11 @@ class GetMyChatsUseCase @Inject constructor(
                     lastMessage = when {
                         !lastMsg?.text.isNullOrBlank() -> lastMsg?.text!!
                         !lastMsg?.imageUrl.isNullOrBlank() -> "📷 Фото"
+                        !lastMsg?.videoUrl.isNullOrBlank() -> "📷 Видео"
                         else -> "Нет сообщений"
                     },
                     lastMessageTime = lastMsg?.timestamp ?: item.chat.lastModified,
-                    hasUnreadMessages = isUnread // <-- Передаем статус для синего кружка
+                    hasUnreadMessages = isUnread
                 )
             }
         }

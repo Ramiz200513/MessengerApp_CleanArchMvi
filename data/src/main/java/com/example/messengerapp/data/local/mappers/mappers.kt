@@ -53,7 +53,8 @@ fun Message.toEntity(): MessageEntity {
         isRead = isRead,
         chatId = "",
         senderId = senderId,
-        imageUrl = imageUrl
+        imageUrl = imageUrl,
+        videoUrl = videoUrl
     )
 }
 
@@ -64,6 +65,7 @@ fun MessageEntity.toDomain(): Message {
         timestamp = timestamp,
         isRead = isRead,
         senderId = senderId,
-        imageUrl = imageUrl
+        imageUrl = imageUrl,
+        videoUrl = videoUrl
     )
 }
