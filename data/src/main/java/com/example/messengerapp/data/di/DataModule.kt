@@ -1,7 +1,7 @@
 package com.example.messengerapp.data.di
 
 import android.app.Application
-
+import android.content.Context
 import androidx.room.Room
 import kotlinx.serialization.json.Json
 import com.example.domain.domain.repository.AuthRepository
@@ -17,6 +17,8 @@ import com.example.messengerapp.data.repository.FirebaseAuthRepositoryImpl
 import com.example.messengerapp.data.repository.FirebaseChatRepositoryImpl
 import com.example.messengerapp.data.repository.ProfileRepositoryImpl
 import com.example.messengerapp.data.repository.UserRepositoryImpl
+import com.example.messengerapp.data.utils.AndroidAudioPlayer
+import com.example.messengerapp.data.utils.AndroidAudioRecorder
 import okhttp3.MediaType.Companion.toMediaType
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
 import com.google.firebase.auth.FirebaseAuth
@@ -26,6 +28,7 @@ import dagger.Binds
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 
 import retrofit2.Retrofit
@@ -104,6 +107,23 @@ abstract class RepositoryModule {
         impl: UserRepositoryImpl
     ): UserRepository
 }
+
+@Module
+@InstallIn(SingletonComponent::class)
+object AudioModule {
+    @Provides
+    @Singleton
+    fun provideAudioRecorder(@ApplicationContext context: Context): AndroidAudioRecorder {
+        return AndroidAudioRecorder(context)
+    }
+
+    @Provides
+    @Singleton
+    fun provideAudioPlayer(@ApplicationContext context: Context): AndroidAudioPlayer {
+        return AndroidAudioPlayer(context)
+    }
+}
+
 @Module
 @InstallIn(SingletonComponent::class)
 object NetworkModule {

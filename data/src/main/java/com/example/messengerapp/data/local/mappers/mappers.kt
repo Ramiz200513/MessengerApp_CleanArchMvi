@@ -6,6 +6,8 @@ import com.example.domain.domain.model.User
 import com.example.messengerapp.data.local.entities.ChatEntity
 import com.example.messengerapp.data.local.entities.MessageEntity
 import com.example.messengerapp.data.local.entities.UserEntity
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 
 fun UserEntity.toDomain(): User {
@@ -51,10 +53,13 @@ fun Message.toEntity(): MessageEntity {
         text = text,
         timestamp = timestamp,
         isRead = isRead,
-        chatId = "",
+        chatId = "", // Note: chatId might need to be passed if available
         senderId = senderId,
         imageUrl = imageUrl,
-        videoUrl = videoUrl
+        videoUrl = videoUrl,
+        voiceUrl = voiceUrl,
+        voiceDuration = voiceDuration,
+        reactionsJson = Json.encodeToString(reactions)
     )
 }
 
@@ -66,6 +71,13 @@ fun MessageEntity.toDomain(): Message {
         isRead = isRead,
         senderId = senderId,
         imageUrl = imageUrl,
-        videoUrl = videoUrl
+        videoUrl = videoUrl,
+        voiceUrl = voiceUrl,
+        voiceDuration = voiceDuration,
+        reactions = try {
+            reactionsJson?.let { Json.decodeFromString(it) } ?: emptyMap()
+        } catch (e: Exception) {
+            emptyMap()
+        }
     )
 }

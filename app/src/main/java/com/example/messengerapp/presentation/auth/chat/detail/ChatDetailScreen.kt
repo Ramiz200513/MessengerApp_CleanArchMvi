@@ -1,8 +1,9 @@
 package com.example.messengerapp.presentation.auth.chat.detail
 import com.example.messengerapp.R
+import android.net.Uri
+import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContract
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -23,15 +24,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
+import com.example.messengerapp.data.utils.AndroidAudioPlayer
+import com.example.messengerapp.data.utils.AndroidAudioRecorder
 import com.example.messengerapp.presentation.auth.chat.detail.messageBubble.FullscreenImageViewer
 import com.example.messengerapp.presentation.auth.chat.detail.messageBubble.MessageBubble
 import com.example.messengerapp.presentation.auth.chat.detail.messageBubble.MessageInput
+import java.io.File
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatDetailScreen(
@@ -40,6 +47,20 @@ fun ChatDetailScreen(
 ) {
     val listState = rememberLazyListState()
     val state by viewModel.state.collectAsState()
+    val context = LocalContext.current
+    
+    val recorder = remember { AndroidAudioRecorder(context) }
+    val audioPlayer = remember { AndroidAudioPlayer(context) }
+    var voiceFile by remember { mutableStateOf<File?>(null) }
+    var recordStartTime by remember { mutableLongStateOf(0L) }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (!isGranted) {
+            // Можно показать Snackbar, что запись невозможна без микрофона
+        }
+    }
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
@@ -124,7 +145,11 @@ fun ChatDetailScreen(
                             isOwnMessage = message.senderId == state.currentUserId,
                             modifier = Modifier.animateItem(),
                             onDeleteClick = { viewModel.handleIntent(ChatDetailIntent.OnDeleteMessage(message.id)) },
-                            onImageClick = { viewModel.openFullscreenImage(it) }
+                            onImageClick = { viewModel.openFullscreenImage(it) },
+                            onToggleReaction = { emoji -> 
+                                viewModel.handleIntent(ChatDetailIntent.OnToggleReaction(message.id, emoji)) 
+                            },
+                            audioPlayer = audioPlayer
                         )
                     }
                 }
@@ -138,6 +163,38 @@ fun ChatDetailScreen(
                     },
                     onVideoClick = {
                         videoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly))
+                    },
+                    onVoiceStart = {
+                        val hasPermission = ContextCompat.checkSelfPermission(
+                            context,
+                            android.Manifest.permission.RECORD_AUDIO
+                        ) == PackageManager.PERMISSION_GRANTED
+
+                        if (hasPermission) {
+                            val file = File(context.cacheDir, "voice_record.m4a")
+                            voiceFile = file
+                            recordStartTime = System.currentTimeMillis()
+                            try {
+                                recorder.start(file)
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        } else {
+                            permissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+                        }
+                    },
+                    onVoiceStop = {
+                        try {
+                            recorder.stop()
+                            val duration = ((System.currentTimeMillis() - recordStartTime) / 1000).toInt()
+                            if (duration > 0) {
+                                voiceFile?.let {
+                                    viewModel.handleIntent(ChatDetailIntent.OnVoiceRecorded(Uri.fromFile(it), duration))
+                                }
+                            }
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
                     }
                 )
 
@@ -152,7 +209,6 @@ fun ChatDetailScreen(
             }
         }
 
-        // ↓ FULLSCREEN — внутри Box, поверх Scaffold, на весь экран
         state.fullscreenImageUrl?.let { url ->
             FullscreenImageViewer(
                 imageUrl = url,

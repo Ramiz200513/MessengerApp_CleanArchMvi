@@ -17,6 +17,7 @@ import com.example.messengerapp.data.network.FcmNotification
 import com.example.messengerapp.data.network.FcmTokenManager
 import com.example.messengerapp.data.network.FcmV1Request
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.SetOptions
@@ -62,12 +63,19 @@ class FirebaseChatRepositoryImpl @Inject constructor(
             val receiverToken = fetchReceiverToken(chatId, currentUserId)
             if (!receiverToken.isNullOrBlank()) {
                 val accessToken = FcmTokenManager.getAccessToken()
+                val body = when {
+                    !message.text.isNullOrBlank() -> message.text
+                    message.imageUrl != null -> "Отправил фото"
+                    message.videoUrl != null -> "Отправил видео"
+                    message.voiceUrl != null -> "Голосовое сообщение"
+                    else -> "Новое сообщение"
+                }
                 val request = FcmV1Request(
                     message = FcmMessage(
                         token = receiverToken,
                         notification = FcmNotification(
                             title = "Новое сообщение",
-                            body = message.text ?: "Отправил фото"
+                            body = body!!
                         )
                     )
                 )
@@ -160,6 +168,9 @@ class FirebaseChatRepositoryImpl @Inject constructor(
                             text = doc.getString("text"),
                             imageUrl = doc.getString("imageUrl"),
                             videoUrl = doc.getString("videoUrl"),
+                            voiceUrl = doc.getString("voiceUrl"),
+                            voiceDuration = doc.getLong("voiceDuration")?.toInt(),
+                            reactions = (doc.get("reactions") as? Map<String, List<String>>) ?: emptyMap(),
                             senderId = doc.getString("senderId") ?: "",
                             timestamp = doc.getLong("timestamp") ?: 0L,
                             isRead = doc.getBoolean("isRead") ?: false
@@ -335,6 +346,9 @@ class FirebaseChatRepositoryImpl @Inject constructor(
                                                 id = msgDoc.id,
                                                 text = msgDoc.getString("text"),
                                                 imageUrl = msgDoc.getString("imageUrl"),
+                                                videoUrl = msgDoc.getString("videoUrl"),
+                                                voiceUrl = msgDoc.getString("voiceUrl"),
+                                                voiceDuration = msgDoc.getLong("voiceDuration")?.toInt(),
                                                 senderId = msgDoc.getString("senderId") ?: "",
                                                 timestamp = msgDoc.getLong("timestamp") ?: 0L,
                                                 isRead = msgDoc.getBoolean("isRead") ?: false
@@ -379,6 +393,53 @@ class FirebaseChatRepositoryImpl @Inject constructor(
                 timestamp = System.currentTimeMillis()
             )
             sendMessage(chatId, message)
+            Result.success(Unit)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun sendVoiceMessage(chatId: String, uri: Uri, duration: Int): Result<Unit> {
+        return try {
+            val currentUserId = auth.currentUser?.uid ?: throw Exception("User not logged in")
+            val voiceId = UUID.randomUUID().toString()
+            val storageRef = storage.reference.child("chats/$chatId/voices/$voiceId.m4a")
+            storageRef.putFile(uri).await()
+            val downloadUrl = storageRef.downloadUrl.await().toString()
+            val message = Message(
+                id = voiceId,
+                text = null,
+                voiceUrl = downloadUrl,
+                voiceDuration = duration,
+                senderId = currentUserId,
+                timestamp = System.currentTimeMillis()
+            )
+            sendMessage(chatId, message)
+            Result.success(Unit)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun toggleReaction(chatId: String, messageId: String, emoji: String): Result<Unit> {
+        return try {
+            val currentUserId = auth.currentUser?.uid ?: throw Exception("User not logged in")
+            val messageRef = firestore.collection("chats")
+                .document(chatId)
+                .collection("messages")
+                .document(messageId)
+
+            val doc = messageRef.get().await()
+            val reactions = (doc.get("reactions") as? Map<String, List<String>>) ?: emptyMap()
+            val users = reactions[emoji] ?: emptyList()
+
+            if (users.contains(currentUserId)) {
+                messageRef.update("reactions.$emoji", FieldValue.arrayRemove(currentUserId)).await()
+            } else {
+                messageRef.update("reactions.$emoji", FieldValue.arrayUnion(currentUserId)).await()
+            }
             Result.success(Unit)
         } catch (e: Exception) {
             e.printStackTrace()
