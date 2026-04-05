@@ -10,6 +10,10 @@ data class MessageEntity (
     val text: String?,
     val senderId: String,
     val timestamp: Long,
-    val isRead: Boolean ,
-    val imageUrl: String? = null
+    val isRead: Boolean,
+    val imageUrl: String? = null,
+    val videoUrl: String? = null,
+    val voiceUrl: String? = null,
+    val voiceDuration: Int? = null,
+    val reactionsJson: String? = null
 )

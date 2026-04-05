@@ -6,6 +6,8 @@ import com.example.domain.domain.model.User
 import com.example.messengerapp.data.local.entities.ChatEntity
 import com.example.messengerapp.data.local.entities.MessageEntity
 import com.example.messengerapp.data.local.entities.UserEntity
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 
 fun UserEntity.toDomain(): User {
@@ -31,14 +33,16 @@ fun ChatEntity.toDomain(): Chat{
     return Chat(
         id = id,
         lastModified = lastModified,
-        participants = participantsCsv.split(",").filter { it.isNotBlank() }
+        participants = participantsCsv.split(",").filter { it.isNotBlank() },
+        isFavorite = isFavorite
     )
 }
 fun Chat.toEntity(): ChatEntity {
     return ChatEntity(
         id = id,
         lastModified = lastModified,
-        participantsCsv = participants.joinToString(",")
+        participantsCsv = participants.joinToString(","),
+        isFavorite = isFavorite
     )
 }
 // MessageMappers.kt
@@ -49,9 +53,13 @@ fun Message.toEntity(): MessageEntity {
         text = text,
         timestamp = timestamp,
         isRead = isRead,
-        chatId = "",
+        chatId = "", // Note: chatId might need to be passed if available
         senderId = senderId,
-        imageUrl = imageUrl
+        imageUrl = imageUrl,
+        videoUrl = videoUrl,
+        voiceUrl = voiceUrl,
+        voiceDuration = voiceDuration,
+        reactionsJson = Json.encodeToString(reactions)
     )
 }
 
@@ -62,6 +70,14 @@ fun MessageEntity.toDomain(): Message {
         timestamp = timestamp,
         isRead = isRead,
         senderId = senderId,
-        imageUrl = imageUrl
+        imageUrl = imageUrl,
+        videoUrl = videoUrl,
+        voiceUrl = voiceUrl,
+        voiceDuration = voiceDuration,
+        reactions = try {
+            reactionsJson?.let { Json.decodeFromString(it) } ?: emptyMap()
+        } catch (e: Exception) {
+            emptyMap()
+        }
     )
 }

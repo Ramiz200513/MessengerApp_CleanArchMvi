@@ -13,7 +13,10 @@ import com.example.domain.domain.usecase.GetUserByIdUseCase
 import com.example.domain.domain.usecase.MarkMessageAsReadUseCase
 import com.example.domain.domain.usecase.ObserveChatUseCase
 import com.example.domain.domain.usecase.SendImageMessageUseCase
+import com.example.domain.domain.usecase.SendVideoMessageUseCase
 import com.example.domain.domain.usecase.SetTypingStatusUseCase
+import com.example.domain.domain.usecase.SendVoiceMessageUseCase
+import com.example.domain.domain.usecase.ToggleReactionUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -41,8 +44,11 @@ class ChatDetailViewModel @Inject constructor(
     private val getUserByIdUseCase: GetUserByIdUseCase,
     private val deleteMessageUseCase: DeleteMessageUseCase,
     private val markMessageAsReadUseCase: MarkMessageAsReadUseCase,
+    private val sendVideoMessageUseCase: SendVideoMessageUseCase,
+    private val sendVoiceMessageUseCase: SendVoiceMessageUseCase,
+    private val toggleReactionUseCase: ToggleReactionUseCase,
     savedStateHandle: SavedStateHandle,
-    ): ViewModel() {
+): ViewModel() {
 
 
     private val chatId: String = checkNotNull(savedStateHandle["chatId"])
@@ -74,10 +80,7 @@ class ChatDetailViewModel @Inject constructor(
                 val myId = _state.value.currentUserId
                 if (myId.isBlank()) return@onEach
                 val partnerId = chat.participants.firstOrNull { it != myId } ?: ""
-
-
-
-                if (partnerId.isNotBlank()) {//
+                if (partnerId.isNotBlank()) {
                     val partnerResult = getUserByIdUseCase(partnerId)
                     partnerResult.onSuccess { user ->
                         _state.update {
@@ -88,8 +91,6 @@ class ChatDetailViewModel @Inject constructor(
                         }
                     }
                 }
-
-
 
                 val isOpponentTyping = chat.typing.entries.any { (userId, isTyping) ->
                     userId != myId && isTyping
@@ -117,6 +118,7 @@ class ChatDetailViewModel @Inject constructor(
             }
             .launchIn(viewModelScope)
     }
+
     private fun markUnreadMessagesAsRead(messages: List<Message>) {
         val myId = _state.value.currentUserId
         if (myId.isBlank()) return
@@ -133,6 +135,7 @@ class ChatDetailViewModel @Inject constructor(
             }
         }
     }
+
     private fun sendMessage() {
         val currentState = _state.value
         if (currentState.currentUserId.isBlank()) return
@@ -152,6 +155,9 @@ class ChatDetailViewModel @Inject constructor(
 
     fun handleIntent(intent: ChatDetailIntent) {
         when(intent) {
+            is ChatDetailIntent.OnVideoSelected -> {
+                sendVideo(intent.uri)
+            }
             is ChatDetailIntent.OnMessageTextChanged -> {
                 _state.update { it.copy(messageText = intent.text) }
                 updateTypingStatus()
@@ -168,8 +174,33 @@ class ChatDetailViewModel @Inject constructor(
             is ChatDetailIntent.OnDeleteMessage -> {
                 deleteMessage(intent.messageId)
             }
+            is ChatDetailIntent.OnVoiceRecorded -> {
+                sendVoice(intent.uri, intent.duration)
+            }
+            is ChatDetailIntent.OnToggleReaction -> {
+                toggleReaction(intent.messageId, intent.emoji)
+            }
         }
     }
+
+    private fun sendVoice(uri: Uri, duration: Int) {
+        viewModelScope.launch {
+            sendVoiceMessageUseCase(chatId, uri, duration)
+                .onFailure { e ->
+                    _state.update { it.copy(error = "Не удалось отправить аудио: ${e.message}") }
+                }
+        }
+    }
+
+    private fun toggleReaction(messageId: String, emoji: String) {
+        viewModelScope.launch {
+            toggleReactionUseCase(chatId, messageId, emoji)
+                .onFailure { e ->
+                    _state.update { it.copy(error = "Ошибка реакции: ${e.message}") }
+                }
+        }
+    }
+
     private fun sendImage(uri: Uri) {
         viewModelScope.launch {
             sendImageMessageUseCase(chatId, uri)
@@ -178,6 +209,24 @@ class ChatDetailViewModel @Inject constructor(
                 }
         }
     }
+
+    private fun sendVideo(uri: Uri){
+        viewModelScope.launch {
+            sendVideoMessageUseCase(chatId,uri)
+                .onFailure{ e->
+                    _state.update { it.copy(error = "Не удалось отправить видео! :${e.message}" ) }
+                }
+        }
+    }
+
+    fun openFullscreenImage(url: String) {
+        _state.update { it.copy(fullscreenImageUrl = url) }
+    }
+
+    fun closeFullscreenImage() {
+        _state.update { it.copy(fullscreenImageUrl = null) }
+    }
+
     private fun deleteMessage(messageId: String) {
         viewModelScope.launch {
             deleteMessageUseCase(chatId, messageId).onFailure { e ->
@@ -185,6 +234,7 @@ class ChatDetailViewModel @Inject constructor(
             }
         }
     }
+
     private fun updateTypingStatus() {
         if (typingJob == null) {
             viewModelScope.launch(Dispatchers.IO) {
@@ -203,6 +253,7 @@ class ChatDetailViewModel @Inject constructor(
             }
         }
     }
+
     override fun onCleared() {
         super.onCleared()
         viewModelScope.launch(Dispatchers.IO + NonCancellable) {

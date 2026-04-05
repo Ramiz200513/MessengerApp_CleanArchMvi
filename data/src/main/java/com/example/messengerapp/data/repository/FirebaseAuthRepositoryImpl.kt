@@ -91,9 +91,21 @@ class FirebaseAuthRepositoryImpl @Inject constructor(
             Result.failure(e)
         }
     }
-
+    override fun getCurrentUserId(): String? = auth.currentUser?.uid
+    override suspend fun updateOnlineStatus(isOnline: Boolean) {
+        val uid = auth.currentUser?.uid ?: return
+        try {
+            firestore.collection("users")
+                .document(uid)
+                .update("online", isOnline)
+                .await()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
     override suspend fun signOut(): Result<Unit> {
         return try {
+            updateOnlineStatus(false)
             auth.signOut()
             db.clearAllTablesData()
 

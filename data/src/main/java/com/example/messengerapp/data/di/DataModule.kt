@@ -1,7 +1,7 @@
 package com.example.messengerapp.data.di
 
 import android.app.Application
-
+import android.content.Context
 import androidx.room.Room
 import kotlinx.serialization.json.Json
 import com.example.domain.domain.repository.AuthRepository
@@ -17,6 +17,8 @@ import com.example.messengerapp.data.repository.FirebaseAuthRepositoryImpl
 import com.example.messengerapp.data.repository.FirebaseChatRepositoryImpl
 import com.example.messengerapp.data.repository.ProfileRepositoryImpl
 import com.example.messengerapp.data.repository.UserRepositoryImpl
+import com.example.messengerapp.data.utils.AndroidAudioPlayer
+import com.example.messengerapp.data.utils.AndroidAudioRecorder
 import okhttp3.MediaType.Companion.toMediaType
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
 import com.google.firebase.auth.FirebaseAuth
@@ -26,6 +28,7 @@ import dagger.Binds
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 
 import retrofit2.Retrofit
@@ -104,6 +107,23 @@ abstract class RepositoryModule {
         impl: UserRepositoryImpl
     ): UserRepository
 }
+
+@Module
+@InstallIn(SingletonComponent::class)
+object AudioModule {
+    @Provides
+    @Singleton
+    fun provideAudioRecorder(@ApplicationContext context: Context): AndroidAudioRecorder {
+        return AndroidAudioRecorder(context)
+    }
+
+    @Provides
+    @Singleton
+    fun provideAudioPlayer(@ApplicationContext context: Context): AndroidAudioPlayer {
+        return AndroidAudioPlayer(context)
+    }
+}
+
 @Module
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
@@ -111,12 +131,9 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideFcmApi(): FcmApi {
-        // 1. Создаем логгер
         val logging = okhttp3.logging.HttpLoggingInterceptor().apply {
             level = okhttp3.logging.HttpLoggingInterceptor.Level.BODY
         }
-
-        // 2. Создаем клиент с логгером
         val client = okhttp3.OkHttpClient.Builder()
             .addInterceptor(logging)
             .build()
@@ -129,7 +146,7 @@ object NetworkModule {
 
         return Retrofit.Builder()
             .baseUrl("https://fcm.googleapis.com/")
-            .client(client) // <--- Добавляем клиент
+            .client(client)
             .addConverterFactory(json.asConverterFactory(contentType))
             .build()
             .create(FcmApi::class.java)

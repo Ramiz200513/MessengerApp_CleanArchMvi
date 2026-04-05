@@ -17,8 +17,10 @@ import com.example.messengerapp.data.network.FcmNotification
 import com.example.messengerapp.data.network.FcmTokenManager
 import com.example.messengerapp.data.network.FcmV1Request
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
+import com.google.firebase.firestore.SetOptions
 import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -61,12 +63,19 @@ class FirebaseChatRepositoryImpl @Inject constructor(
             val receiverToken = fetchReceiverToken(chatId, currentUserId)
             if (!receiverToken.isNullOrBlank()) {
                 val accessToken = FcmTokenManager.getAccessToken()
+                val body = when {
+                    !message.text.isNullOrBlank() -> message.text
+                    message.imageUrl != null -> "Отправил фото"
+                    message.videoUrl != null -> "Отправил видео"
+                    message.voiceUrl != null -> "Голосовое сообщение"
+                    else -> "Новое сообщение"
+                }
                 val request = FcmV1Request(
                     message = FcmMessage(
                         token = receiverToken,
                         notification = FcmNotification(
                             title = "Новое сообщение",
-                            body = message.text ?: "Отправил фото"
+                            body = body!!
                         )
                     )
                 )
@@ -111,7 +120,10 @@ class FirebaseChatRepositoryImpl @Inject constructor(
                         }
                         if (snapshot != null) {
                             val chats = snapshot.documents.mapNotNull { doc ->
-                                doc.toObject(Chat::class.java)?.copy(id = doc.id)
+                                doc.toObject(Chat::class.java)?.copy(
+                                    id = doc.id,
+                                    isFavorite = doc.getBoolean("isFavorite") ?: false
+                                )
                             }
                             launch {
                                 chatDao.upsertChats(chats.map { it.toEntity() })
@@ -139,6 +151,7 @@ class FirebaseChatRepositoryImpl @Inject constructor(
                     send(entities.map { it.toDomain() })
                 }
             }
+
             val query = firestore.collection("chats")
                 .document(chatId)
                 .collection("messages")
@@ -154,6 +167,10 @@ class FirebaseChatRepositoryImpl @Inject constructor(
                             id = doc.id,
                             text = doc.getString("text"),
                             imageUrl = doc.getString("imageUrl"),
+                            videoUrl = doc.getString("videoUrl"),
+                            voiceUrl = doc.getString("voiceUrl"),
+                            voiceDuration = doc.getLong("voiceDuration")?.toInt(),
+                            reactions = (doc.get("reactions") as? Map<String, List<String>>) ?: emptyMap(),
                             senderId = doc.getString("senderId") ?: "",
                             timestamp = doc.getLong("timestamp") ?: 0L,
                             isRead = doc.getBoolean("isRead") ?: false
@@ -212,7 +229,8 @@ class FirebaseChatRepositoryImpl @Inject constructor(
             val newChatEntity = ChatEntity(
                 id = newChatId,
                 lastModified = System.currentTimeMillis(),
-                participantsCsv = listOf(currentUserId,otherUserId).joinToString(",")
+                participantsCsv = listOf(currentUserId,otherUserId).joinToString(","),
+                isFavorite = false
             )
             chatDao.upsertChats(listOf(newChatEntity))
             Result.success(documentReference.id)
@@ -221,6 +239,32 @@ class FirebaseChatRepositoryImpl @Inject constructor(
             Result.failure(e)
         }
     }
+
+    override suspend fun sendVideoMessage(
+        chatId: String,
+        uri: Uri
+    ): Result<Unit> {
+        return try {
+            val currentId = auth.currentUser?.uid ?: throw Exception("Юзер не вошел в аккаунт!")
+            val videoId = UUID.randomUUID().toString()
+            val storageRef = storage.reference.child("chats/$chatId/videos/$videoId.mp4")
+            storageRef.putFile(uri).await()
+            val downloadUrl = storageRef.downloadUrl.await().toString()
+            val message = Message(
+                id = videoId,
+                text = "",
+                videoUrl = downloadUrl,
+                senderId = currentId,
+                timestamp = System.currentTimeMillis()
+            )
+            sendMessage(chatId, message)
+            Result.success(Unit)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Result.failure(e)
+        }
+        }
+
 
     override suspend fun setTypingStatus(chatId: String, isTyping: Boolean) {
         val currentUserId = auth.currentUser?.uid ?: return
@@ -278,10 +322,45 @@ class FirebaseChatRepositoryImpl @Inject constructor(
 
                         if (snapshot != null) {
                             val chats = snapshot.documents.mapNotNull { doc ->
-                                doc.toObject(Chat::class.java)?.copy(id = doc.id)
+                                doc.toObject(Chat::class.java)?.copy(
+                                    id = doc.id,
+                                    isFavorite = doc.getBoolean("isFavorite") ?: false
+                                )
                             }
+
                             launch {
                                 chatDao.upsertChats(chats.map { it.toEntity() })
+                                chats.forEach { chat ->
+                                    try {
+                                        val msgsSnapshot = firestore.collection("chats")
+                                            .document(chat.id)
+                                            .collection("messages")
+                                            .orderBy("timestamp", Query.Direction.DESCENDING)
+                                            .limit(1)
+                                            .get()
+                                            .await()
+
+                                        val msgDoc = msgsSnapshot.documents.firstOrNull()
+                                        if (msgDoc != null) {
+                                            val lastMessage = Message(
+                                                id = msgDoc.id,
+                                                text = msgDoc.getString("text"),
+                                                imageUrl = msgDoc.getString("imageUrl"),
+                                                videoUrl = msgDoc.getString("videoUrl"),
+                                                voiceUrl = msgDoc.getString("voiceUrl"),
+                                                voiceDuration = msgDoc.getLong("voiceDuration")?.toInt(),
+                                                senderId = msgDoc.getString("senderId") ?: "",
+                                                timestamp = msgDoc.getLong("timestamp") ?: 0L,
+                                                isRead = msgDoc.getBoolean("isRead") ?: false
+                                            )
+
+                                            val messageEntity = lastMessage.toEntity().copy(chatId = chat.id)
+                                            messageDao.upsertMessages(listOf(messageEntity))
+                                        }
+                                    } catch (e: Exception) {
+                                        e.printStackTrace()
+                                    }
+                                }
                             }
                         }
                     }
@@ -321,6 +400,53 @@ class FirebaseChatRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun sendVoiceMessage(chatId: String, uri: Uri, duration: Int): Result<Unit> {
+        return try {
+            val currentUserId = auth.currentUser?.uid ?: throw Exception("User not logged in")
+            val voiceId = UUID.randomUUID().toString()
+            val storageRef = storage.reference.child("chats/$chatId/voices/$voiceId.m4a")
+            storageRef.putFile(uri).await()
+            val downloadUrl = storageRef.downloadUrl.await().toString()
+            val message = Message(
+                id = voiceId,
+                text = null,
+                voiceUrl = downloadUrl,
+                voiceDuration = duration,
+                senderId = currentUserId,
+                timestamp = System.currentTimeMillis()
+            )
+            sendMessage(chatId, message)
+            Result.success(Unit)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun toggleReaction(chatId: String, messageId: String, emoji: String): Result<Unit> {
+        return try {
+            val currentUserId = auth.currentUser?.uid ?: throw Exception("User not logged in")
+            val messageRef = firestore.collection("chats")
+                .document(chatId)
+                .collection("messages")
+                .document(messageId)
+
+            val doc = messageRef.get().await()
+            val reactions = (doc.get("reactions") as? Map<String, List<String>>) ?: emptyMap()
+            val users = reactions[emoji] ?: emptyList()
+
+            if (users.contains(currentUserId)) {
+                messageRef.update("reactions.$emoji", FieldValue.arrayRemove(currentUserId)).await()
+            } else {
+                messageRef.update("reactions.$emoji", FieldValue.arrayUnion(currentUserId)).await()
+            }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Result.failure(e)
+        }
+    }
+
     override suspend fun deleteMessage(
         chatId: String,
         messageId: String
@@ -347,6 +473,23 @@ class FirebaseChatRepositoryImpl @Inject constructor(
                 .collection("messages")
                 .document(messageId)
                 .update("isRead", true)
+                .await()
+
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    override suspend fun markAsFavorite(chatId: String) {
+        try {
+            val chat = chatDao.getChatOneShot(chatId) ?: return
+            val newStatus = !chat.isFavorite
+
+
+            chatDao.updateFavoriteStatus(chatId, newStatus)
+            firestore.collection("chats")
+                .document(chatId)
+                .set(mapOf("isFavorite" to newStatus), SetOptions.merge())
                 .await()
 
         } catch (e: Exception) {
