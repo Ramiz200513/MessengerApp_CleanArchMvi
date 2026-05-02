@@ -8,9 +8,19 @@ import com.example.messengerapp.data.local.dao.MessageDao
 import com.example.messengerapp.data.local.dao.UserDao
 import com.example.messengerapp.data.local.entities.ChatEntity
 import com.example.messengerapp.data.local.entities.MessageEntity
+import com.example.messengerapp.data.local.entities.MessageFtsEntity
 import com.example.messengerapp.data.local.entities.UserEntity
 
-@Database(entities = [ChatEntity::class, MessageEntity::class, UserEntity::class], version =7 , exportSchema = false)
+@Database(
+    entities = [
+        ChatEntity::class, 
+        MessageEntity::class, 
+        UserEntity::class, 
+        MessageFtsEntity::class
+    ], 
+    version = 12,
+    exportSchema = false
+)
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun chatDao(): ChatDao

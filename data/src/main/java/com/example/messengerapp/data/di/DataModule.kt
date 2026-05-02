@@ -8,15 +8,18 @@ import com.example.domain.domain.repository.AuthRepository
 import com.example.domain.domain.repository.ChatRepository
 import com.example.domain.domain.repository.ProfileRepository
 import com.example.domain.domain.repository.UserRepository
+import com.example.domain.domain.repository.AITranslatorRepository
 import com.example.messengerapp.data.local.AppDatabase
 import com.example.messengerapp.data.local.dao.ChatDao
 import com.example.messengerapp.data.local.dao.MessageDao
 import com.example.messengerapp.data.local.dao.UserDao
 import com.example.messengerapp.data.network.FcmApi
+import com.example.messengerapp.data.network.OpenAIWhisperApi
 import com.example.messengerapp.data.repository.FirebaseAuthRepositoryImpl
 import com.example.messengerapp.data.repository.FirebaseChatRepositoryImpl
 import com.example.messengerapp.data.repository.ProfileRepositoryImpl
 import com.example.messengerapp.data.repository.UserRepositoryImpl
+import com.example.messengerapp.data.repository.MyAITranslatorImpl
 import com.example.messengerapp.data.utils.AndroidAudioPlayer
 import com.example.messengerapp.data.utils.AndroidAudioRecorder
 import okhttp3.MediaType.Companion.toMediaType
@@ -106,6 +109,12 @@ abstract class RepositoryModule {
     abstract fun bindUserRepository(
         impl: UserRepositoryImpl
     ): UserRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindAITranslatorRepository(
+        impl: MyAITranslatorImpl
+    ): AITranslatorRepository
 }
 
 @Module
@@ -128,6 +137,24 @@ object AudioModule {
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
 
+
+    private val networkJson = Json {
+        ignoreUnknownKeys = true 
+        encodeDefaults = true
+    }
+
+    @Provides
+    @Singleton
+    fun provideWhisperApi(): OpenAIWhisperApi {
+        val contentType = "application/json".toMediaType()
+
+        return Retrofit.Builder()
+            .baseUrl("https://api.openai.com/")
+            .addConverterFactory(networkJson.asConverterFactory(contentType))
+            .build()
+            .create(OpenAIWhisperApi::class.java)
+    }
+
     @Provides
     @Singleton
     fun provideFcmApi(): FcmApi {
@@ -139,15 +166,11 @@ object NetworkModule {
             .build()
 
         val contentType = "application/json".toMediaType()
-        val json = Json {
-            ignoreUnknownKeys = true
-            encodeDefaults = true
-        }
 
         return Retrofit.Builder()
             .baseUrl("https://fcm.googleapis.com/")
             .client(client)
-            .addConverterFactory(json.asConverterFactory(contentType))
+            .addConverterFactory(networkJson.asConverterFactory(contentType))
             .build()
             .create(FcmApi::class.java)
     }

@@ -2,6 +2,7 @@ package com.example.messengerapp.data.local.dao
 
 import androidx.room.Dao
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Upsert
 import com.example.messengerapp.data.local.entities.MessageEntity
 import kotlinx.coroutines.flow.Flow
@@ -10,12 +11,25 @@ import kotlinx.coroutines.flow.Flow
 interface MessageDao {
     @Query("SELECT * FROM messages WHERE chatId = :chatId ORDER BY timestamp DESC")
     fun getMessagesByChatId(chatId: String): Flow<List<MessageEntity>>
+    
     @Upsert
     suspend fun upsertMessages(messages: List<MessageEntity>)
+    
     @Query("DELETE FROM messages")
     suspend fun clearAll()
+    
     @Query("Delete from messages where id=:id")
     suspend fun deleteMessageById(id:String)
+    
     @Query("Update messages Set isRead = 1 Where id =:messageId")
     suspend fun markAsRead(messageId: String)
+
+    @Transaction
+    @Query("""
+    SELECT messages.* FROM messages 
+    JOIN messages_fts ON messages.rowid = messages_fts.rowid 
+    WHERE messages.chatId = :chatId AND messages_fts.text MATCH :query
+    ORDER BY messages.timestamp DESC
+""")
+    fun searchMessagesInChat(chatId: String, query: String): Flow<List<MessageEntity>>
 }

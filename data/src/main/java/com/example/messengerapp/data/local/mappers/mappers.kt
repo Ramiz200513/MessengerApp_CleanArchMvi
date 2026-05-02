@@ -9,7 +9,6 @@ import com.example.messengerapp.data.local.entities.UserEntity
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
-
 fun UserEntity.toDomain(): User {
     return User(
         id = id,
@@ -20,7 +19,7 @@ fun UserEntity.toDomain(): User {
     )
 }
 
-fun User.toEntity(): UserEntity{
+fun User.toEntity(): UserEntity {
     return UserEntity(
         id = id,
         username = username,
@@ -29,7 +28,8 @@ fun User.toEntity(): UserEntity{
         fcmToken = fcmToken,
     )
 }
-fun ChatEntity.toDomain(): Chat{
+
+fun ChatEntity.toDomain(): Chat {
     return Chat(
         id = id,
         lastModified = lastModified,
@@ -37,6 +37,7 @@ fun ChatEntity.toDomain(): Chat{
         isFavorite = isFavorite
     )
 }
+
 fun Chat.toEntity(): ChatEntity {
     return ChatEntity(
         id = id,
@@ -45,7 +46,8 @@ fun Chat.toEntity(): ChatEntity {
         isFavorite = isFavorite
     )
 }
-// MessageMappers.kt
+
+// --- MessageMappers.kt ---
 
 fun Message.toEntity(): MessageEntity {
     return MessageEntity(
@@ -53,13 +55,18 @@ fun Message.toEntity(): MessageEntity {
         text = text,
         timestamp = timestamp,
         isRead = isRead,
-        chatId = "", // Note: chatId might need to be passed if available
+        chatId = "",
         senderId = senderId,
         imageUrl = imageUrl,
         videoUrl = videoUrl,
         voiceUrl = voiceUrl,
         voiceDuration = voiceDuration,
-        reactionsJson = Json.encodeToString(reactions)
+        reactionsJson = Json.encodeToString(reactions),
+        replyToMessageId = replyToMessageId,
+        replyToMessageText = replyToMessageText,
+        voiceTranscription = voiceTranscription,
+        isTranscribing = isTranscribing,
+        isPinned = isPinned // НОВОЕ
     )
 }
 
@@ -74,6 +81,11 @@ fun MessageEntity.toDomain(): Message {
         videoUrl = videoUrl,
         voiceUrl = voiceUrl,
         voiceDuration = voiceDuration,
+        replyToMessageId = replyToMessageId,
+        replyToMessageText = replyToMessageText,
+        voiceTranscription = voiceTranscription,
+        isTranscribing = isTranscribing,
+        isPinned = isPinned, // НОВОЕ
         reactions = try {
             reactionsJson?.let { Json.decodeFromString(it) } ?: emptyMap()
         } catch (e: Exception) {

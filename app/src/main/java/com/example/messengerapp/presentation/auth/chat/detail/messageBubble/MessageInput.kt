@@ -1,9 +1,9 @@
 package com.example.messengerapp.presentation.auth.chat.detail.messageBubble
 
-import android.annotation.SuppressLint
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,11 +17,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MessageInput(
     text: String,
@@ -34,63 +35,127 @@ fun MessageInput(
 ) {
     var isRecording by remember { mutableStateOf(false) }
 
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(8.dp)
-            .background(MaterialTheme.colorScheme.surface),
-        verticalAlignment = Alignment.CenterVertically
+    val micColor by animateColorAsState(
+        targetValue = if (isRecording) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+        animationSpec = tween(300),
+        label = "mic_color"
+    )
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 8.dp,
+        tonalElevation = 2.dp
     ) {
-        IconButton(onClick = onAttachClick) {
-            Icon(Icons.Default.AttachFile, contentDescription = "Attach")
-        }
-
-        IconButton(onClick = onVideoClick) {
-            Icon(Icons.Default.VideoCall, contentDescription = "Видео")
-        }
-
-        OutlinedTextField(
-            value = if (isRecording) "Запись..." else text,
-            onValueChange = onTextChange,
-            modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
-            placeholder = { Text("Сообщение") },
-            maxLines = 4,
-            readOnly = isRecording,
-            shape = RoundedCornerShape(24.dp)
-        )
-
-        if (text.isBlank()) {
-            // Используем Box вместо IconButton для точного отслеживания нажатия
-            Box(
-                modifier = Modifier
-                    .padding(start = 4.dp)
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(if (isRecording) Color.Red.copy(alpha = 0.1f) else Color.Transparent)
-                    .pointerInput(Unit) {
-                        awaitPointerEventScope {
-                            while (true) {
-                                awaitFirstDown() // Срабатывает сразу при касании
-                                isRecording = true
-                                onVoiceStart()
-                                
-                                waitForUpOrCancellation() // Ждем, пока отпустит
-                                isRecording = false
-                                onVoiceStop()
-                            }
-                        }
-                    },
-                contentAlignment = Alignment.Center
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.Bottom
+        ) {
+            // Кнопка прикрепить
+            IconButton(
+                onClick = onAttachClick,
+                modifier = Modifier.size(40.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Default.Mic,
-                    contentDescription = "Voice",
-                    tint = if (isRecording) Color.Red else MaterialTheme.colorScheme.primary
+                    Icons.Default.AttachFile,
+                    contentDescription = "Attach",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-        } else {
-            IconButton(onClick = onSendClick) {
-                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send", tint = MaterialTheme.colorScheme.primary)
+
+            // Кнопка видео
+            IconButton(
+                onClick = onVideoClick,
+                modifier = Modifier.size(40.dp)
+            ) {
+                Icon(
+                    Icons.Default.VideoCall,
+                    contentDescription = "Video",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            // Поле ввода
+            OutlinedTextField(
+                value = if (isRecording) "🎙 Говорите..." else text,
+                onValueChange = onTextChange,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 4.dp),
+                placeholder = {
+                    Text(
+                        "Сообщение",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        fontSize = 15.sp
+                    )
+                },
+                maxLines = 4,
+                readOnly = isRecording,
+                shape = RoundedCornerShape(24.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                ),
+                textStyle = MaterialTheme.typography.bodyLarge.copy(fontSize = 15.sp)
+            )
+
+            Spacer(modifier = Modifier.width(4.dp))
+
+            // Кнопка микрофон / отправить
+            if (text.isBlank()) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (isRecording) MaterialTheme.colorScheme.errorContainer
+                            else MaterialTheme.colorScheme.primaryContainer
+                        )
+                        .pointerInput(Unit) {
+                            detectTapGestures(
+                                onPress = {
+                                    isRecording = true
+                                    onVoiceStart()
+                                    tryAwaitRelease()
+                                    isRecording = false
+                                    onVoiceStop()
+                                }
+                            )
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Mic,
+                        contentDescription = "Voice",
+                        tint = if (isRecording) MaterialTheme.colorScheme.onErrorContainer
+                        else MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary),
+                    contentAlignment = Alignment.Center
+                ) {
+                    IconButton(
+                        onClick = onSendClick,
+                        modifier = Modifier.size(44.dp)
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.Send,
+                            contentDescription = "Send",
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
             }
         }
     }

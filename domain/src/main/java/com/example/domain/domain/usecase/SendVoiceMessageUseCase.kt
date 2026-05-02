@@ -7,7 +7,7 @@ import javax.inject.Inject
 class SendVoiceMessageUseCase @Inject constructor(
     private val repository: ChatRepository
 ) {
-    suspend operator fun invoke(chatId: String, uri: Uri, duration: Int): Result<Unit> {
-        return repository.sendVoiceMessage(chatId, uri, duration)
+    suspend operator fun invoke(chatId: String, uri: Uri, duration: Int,text:String?): Result<Unit> {
+        return repository.sendVoiceMessage(chatId, uri, duration,text)
     }
 }

@@ -12,7 +12,7 @@ class AndroidAudioPlayer(
     fun playFile(url: String) {
         stop()
         player = MediaPlayer().apply {
-            setDataSource(context, url.toUri())
+            setDataSource(url)
             prepare()
             start()
         }

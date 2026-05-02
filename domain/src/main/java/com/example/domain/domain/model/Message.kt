@@ -13,5 +13,10 @@ data class Message(
     val reactions: Map<String, List<String>> = emptyMap(),
     val senderId: String = "",
     val timestamp: Long = 0L,
-    val isRead: Boolean = false
+    val isRead: Boolean = false,
+    val replyToMessageId: String? = null,
+    val replyToMessageText: String? = null,
+    val voiceTranscription: String? = null,
+    val isTranscribing: Boolean = false,
+    val isPinned: Boolean = false // НОВОЕ
 )

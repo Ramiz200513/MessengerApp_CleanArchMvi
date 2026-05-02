@@ -6,19 +6,23 @@ import com.example.domain.domain.model.ChatWithMessages
 import com.example.domain.domain.model.Message
 import kotlinx.coroutines.flow.Flow
 
+
 interface ChatRepository {
+    suspend fun transcribeVoiceMessage(chatId: String, messageId: String, audioUrl: String): Result<Unit>
+    fun searchMessages(chatId: String, query: String): Flow<List<Message>>
     suspend fun sendMessage(chatId: String, message: Message)
-    fun getChats():Flow<List<Chat>>
+    fun getChats(): Flow<List<Chat>>
     fun getMessages(chatId: String): Flow<List<Message>>
-    suspend fun createChat(otherUserId:String): Result<String>
-    suspend fun sendVideoMessage(chatId: String,uri: Uri):Result<Unit>
-    suspend fun setTypingStatus(chatId: String,isTyping: Boolean)
+    suspend fun createChat(otherUserId: String): Result<String>
+    suspend fun sendVideoMessage(chatId: String, uri: Uri): Result<Unit>
+    suspend fun setTypingStatus(chatId: String, isTyping: Boolean)
     fun observeChat(chatId: String): Flow<Chat>
     fun getChatsWithMessages(): Flow<List<ChatWithMessages>>
-    suspend fun sendImageMessage(chatId:String,image: Uri):Result<Unit>
-    suspend fun sendVoiceMessage(chatId: String, uri: Uri, duration: Int): Result<Unit>
+    suspend fun sendImageMessage(chatId: String, image: Uri): Result<Unit>
+    suspend fun sendVoiceMessage(chatId: String, uri: Uri, duration: Int, text: String?): Result<Unit>
     suspend fun toggleReaction(chatId: String, messageId: String, emoji: String): Result<Unit>
-    suspend fun deleteMessage(chatId: String,messageId: String):Result<Unit>
-    suspend fun markMessageAsRead(chatId:String,messageId: String)
+    suspend fun deleteMessage(chatId: String, messageId: String): Result<Unit>
+    suspend fun markMessageAsRead(chatId: String, messageId: String)
     suspend fun markAsFavorite(chatId: String)
+    suspend fun pinMessage(chatId: String, messageId: String, pin: Boolean): Result<Unit> // НОВОЕ
 }
