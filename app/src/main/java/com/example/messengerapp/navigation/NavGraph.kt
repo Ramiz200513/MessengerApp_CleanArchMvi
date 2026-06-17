@@ -1,5 +1,6 @@
 package com.example.messengerapp.navigation
 
+
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavController
@@ -22,7 +23,9 @@ sealed class Screen(val route: String) {
     object ChatDetail : Screen("chat_detail/{chatId}") {
         fun createRoute(chatId: String) = "chat_detail/$chatId"
     }
-    object Profile : Screen("profile")
+    object Profile : Screen("profile/{userId}"){
+        fun createRoute(userId:String) = "profile/$userId"
+    }
     object Search : Screen("search")
 }
 @Composable
@@ -42,7 +45,7 @@ fun AppNavGraph(
             ChatListScreen(navController)
         }
         composable(
-            route = Screen.ChatDetail.route, // Используем константу из Screen
+            route = Screen.ChatDetail.route,
             arguments = listOf(
                 navArgument("chatId") { type = NavType.StringType }
             )
@@ -50,8 +53,12 @@ fun AppNavGraph(
             val chatId = backStackEntry.arguments?.getString("chatId") ?: ""
             ChatDetailScreen(navController = navController)
         }
-        composable(route = Screen.Profile.route){
-            ProfileScreen(navController)
+        composable(
+            route = Screen.Profile.route,
+            arguments = listOf(navArgument("userId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val userId = backStackEntry.arguments?.getString("userId") ?: ""
+            ProfileScreen(navController = navController, userId = userId) // Передай userId в экран
         }
         composable(Screen.Search.route) {
 

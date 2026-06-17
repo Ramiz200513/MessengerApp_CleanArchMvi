@@ -1,9 +1,12 @@
 package com.example.messengerapp.presentation.auth.profile
 
 import android.net.Uri
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.domain.domain.repository.AuthRepository
 import com.example.domain.domain.usecase.GetCurrentUserUseCase
+import com.example.domain.domain.usecase.GetUserByIdUseCase
 import com.example.domain.domain.usecase.SaveProfileUseCase
 import com.example.domain.domain.usecase.SignOutUseCase
 import com.example.domain.domain.usecase.UploadAvatarUseCase
@@ -21,25 +24,51 @@ class ProfileViewModel @Inject constructor(
     private val signOutUseCase: SignOutUseCase,
     private val saveProfileUseCase: SaveProfileUseCase,
     private val uploadAvatarUseCase: UploadAvatarUseCase,
-): ViewModel(){
-    private val _state = MutableStateFlow(ProfileState(
-    ))
+    private val getUserByIdUseCase: GetUserByIdUseCase,
+    private val authRepository: AuthRepository,
+    savedStateHandle: SavedStateHandle
+) : ViewModel() {
+
+    private val rawUserId:String = savedStateHandle.get<String>("userId") ?: ""
+    private val currentUid = authRepository.getCurrentUserId() ?: ""
+    private val userId: String = if (rawUserId == "me" || rawUserId == "{userId}" || rawUserId.isBlank()) {
+        currentUid
+    } else {
+        rawUserId
+    }
+
+    val isMyProfile: Boolean = userId == currentUid
+
+    private val _state = MutableStateFlow(ProfileState())
     val state: StateFlow<ProfileState> = _state.asStateFlow()
-    init{
+
+    init {
+        _state.update { it.copy(isMyProfile = isMyProfile) }
         handleIntent(ProfileIntent.LoadProfile)
     }
-    fun handleIntent(intent: ProfileIntent){
-        when(intent){
-            ProfileIntent.LoadProfile -> {
-               loadProfile()
+
+    fun handleIntent(intent: ProfileIntent) {
+        when (intent) {
+            ProfileIntent.LoadProfile -> loadProfile()
+            is ProfileIntent.OnAvatarChanged -> updateAvatarInState(intent.uri)
+            is ProfileIntent.OnNameChanged -> updateNameInState(intent.newName)
+            is ProfileIntent.OnSaveProfile -> saveChanges()
+            is ProfileIntent.OnSignOutClicked -> logOut()
+        }
+    }
+
+    private fun loadProfile() {
+        viewModelScope.launch {
+            _state.update { it.copy(isLoading = true, error = null) }
+            val result = if (isMyProfile) {
+                getCurrentUserUseCase()
+            } else {
+                getUserByIdUseCase(userId)
             }
-            is ProfileIntent.OnAvatarChanged -> { updateAvatarInState(intent.uri) }
-            is ProfileIntent.OnNameChanged -> {updateNameInState(intent.newName)}
-            is ProfileIntent.OnSaveProfile -> {
-                saveChanges()
-            }
-            is ProfileIntent.OnSignOutClicked -> {
-                logOut()
+            result.onSuccess { user ->
+                _state.update { it.copy(isLoading = false, user = user) }
+            }.onFailure { e ->
+                _state.update { it.copy(isLoading = false, error = e.message) }
             }
         }
     }
@@ -47,14 +76,9 @@ class ProfileViewModel @Inject constructor(
     private fun updateAvatarInState(uri: Uri) {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true) }
-
             uploadAvatarUseCase(uri = uri).onSuccess { newUrl ->
                 _state.update { currentState ->
-                    val updatedUser = currentState.user?.copy(photoUrl = newUrl)
-                    currentState.copy(
-                        isLoading = false,
-                        user = updatedUser
-                    )
+                    currentState.copy(isLoading = false, user = currentState.user?.copy(photoUrl = newUrl))
                 }
             }.onFailure { e ->
                 _state.update { it.copy(isLoading = false, error = e.message) }
@@ -75,25 +99,12 @@ class ProfileViewModel @Inject constructor(
     }
 
     private fun updateNameInState(newName: String) {
-        val currentUser = _state.value.user
-        _state.update { it.copy(user = currentUser?.copy(username = newName)) }
-    }
-
-    private fun loadProfile() {
-        viewModelScope.launch {
-            _state.update {it.copy(isLoading = true, error = null)}
-            getCurrentUserUseCase().onSuccess { user ->
-                _state.update {it.copy(isLoading = false, user = user)}
-            }.onFailure { e ->
-                _state.update { it.copy(isLoading = false, error = e.message) }
-            }
-        }
+        _state.update { it.copy(user = it.user?.copy(username = newName)) }
     }
 
     private fun logOut() {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true) }
-
             signOutUseCase().onSuccess {
                 _state.update { it.copy(isSignedOut = true, isLoading = false) }
             }.onFailure { e ->
@@ -101,5 +112,4 @@ class ProfileViewModel @Inject constructor(
             }
         }
     }
-
 }

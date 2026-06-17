@@ -7,5 +7,6 @@ import androidx.room.PrimaryKey
 data class ChatEntity(
     @PrimaryKey val id: String,
     val lastModified: Long,
-    val participantsCsv: String
+    val participantsCsv: String,
+    val isFavorite: Boolean
 )

@@ -1,22 +1,27 @@
 package com.example.messengerapp.data.di
 
 import android.app.Application
-
+import android.content.Context
 import androidx.room.Room
 import kotlinx.serialization.json.Json
 import com.example.domain.domain.repository.AuthRepository
 import com.example.domain.domain.repository.ChatRepository
 import com.example.domain.domain.repository.ProfileRepository
 import com.example.domain.domain.repository.UserRepository
+import com.example.domain.domain.repository.AITranslatorRepository
 import com.example.messengerapp.data.local.AppDatabase
 import com.example.messengerapp.data.local.dao.ChatDao
 import com.example.messengerapp.data.local.dao.MessageDao
 import com.example.messengerapp.data.local.dao.UserDao
 import com.example.messengerapp.data.network.FcmApi
+import com.example.messengerapp.data.network.OpenAIWhisperApi
 import com.example.messengerapp.data.repository.FirebaseAuthRepositoryImpl
 import com.example.messengerapp.data.repository.FirebaseChatRepositoryImpl
 import com.example.messengerapp.data.repository.ProfileRepositoryImpl
 import com.example.messengerapp.data.repository.UserRepositoryImpl
+import com.example.messengerapp.data.repository.MyAITranslatorImpl
+import com.example.messengerapp.data.utils.AndroidAudioPlayer
+import com.example.messengerapp.data.utils.AndroidAudioRecorder
 import okhttp3.MediaType.Companion.toMediaType
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
 import com.google.firebase.auth.FirebaseAuth
@@ -26,6 +31,7 @@ import dagger.Binds
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 
 import retrofit2.Retrofit
@@ -103,34 +109,68 @@ abstract class RepositoryModule {
     abstract fun bindUserRepository(
         impl: UserRepositoryImpl
     ): UserRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindAITranslatorRepository(
+        impl: MyAITranslatorImpl
+    ): AITranslatorRepository
 }
+
+@Module
+@InstallIn(SingletonComponent::class)
+object AudioModule {
+    @Provides
+    @Singleton
+    fun provideAudioRecorder(@ApplicationContext context: Context): AndroidAudioRecorder {
+        return AndroidAudioRecorder(context)
+    }
+
+    @Provides
+    @Singleton
+    fun provideAudioPlayer(@ApplicationContext context: Context): AndroidAudioPlayer {
+        return AndroidAudioPlayer(context)
+    }
+}
+
 @Module
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
 
+
+    private val networkJson = Json {
+        ignoreUnknownKeys = true 
+        encodeDefaults = true
+    }
+
+    @Provides
+    @Singleton
+    fun provideWhisperApi(): OpenAIWhisperApi {
+        val contentType = "application/json".toMediaType()
+
+        return Retrofit.Builder()
+            .baseUrl("https://api.openai.com/")
+            .addConverterFactory(networkJson.asConverterFactory(contentType))
+            .build()
+            .create(OpenAIWhisperApi::class.java)
+    }
+
     @Provides
     @Singleton
     fun provideFcmApi(): FcmApi {
-        // 1. Создаем логгер
         val logging = okhttp3.logging.HttpLoggingInterceptor().apply {
             level = okhttp3.logging.HttpLoggingInterceptor.Level.BODY
         }
-
-        // 2. Создаем клиент с логгером
         val client = okhttp3.OkHttpClient.Builder()
             .addInterceptor(logging)
             .build()
 
         val contentType = "application/json".toMediaType()
-        val json = Json {
-            ignoreUnknownKeys = true
-            encodeDefaults = true
-        }
 
         return Retrofit.Builder()
             .baseUrl("https://fcm.googleapis.com/")
-            .client(client) // <--- Добавляем клиент
-            .addConverterFactory(json.asConverterFactory(contentType))
+            .client(client)
+            .addConverterFactory(networkJson.asConverterFactory(contentType))
             .build()
             .create(FcmApi::class.java)
     }

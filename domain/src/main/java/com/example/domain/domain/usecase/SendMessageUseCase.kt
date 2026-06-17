@@ -6,17 +6,22 @@ import java.util.UUID
 import javax.inject.Inject
 
 class SendMessageUseCase @Inject constructor(
-    private val repository: ChatRepository
+    private val chatRepository: ChatRepository
 ) {
-    suspend operator fun invoke(chatId: String, text: String, userId: String) {
+    suspend operator fun invoke(
+        chatId: String,
+        text: String,
+        userId: String,
+        replyToMessageId: String? = null,   // ДОБАВЛЯЕМ
+        replyToMessageText: String? = null  // ДОБАВЛЯЕМ
+    ) {
         val message = Message(
             id = UUID.randomUUID().toString(),
             text = text,
             senderId = userId,
-            timestamp = System.currentTimeMillis(),
-            isRead = false,
-            imageUrl = null,
+            replyToMessageId = replyToMessageId,     // ПЕРЕДАЕМ В МОДЕЛЬ
+            replyToMessageText = replyToMessageText  // ПЕРЕДАЕМ В МОДЕЛЬ
         )
-        repository.sendMessage(chatId, message)
+        chatRepository.sendMessage(chatId, message)
     }
 }

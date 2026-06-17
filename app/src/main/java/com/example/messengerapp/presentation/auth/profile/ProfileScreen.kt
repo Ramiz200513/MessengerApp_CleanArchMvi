@@ -36,10 +36,10 @@ import com.example.messengerapp.R
 @Composable
 fun ProfileScreen(
     navController: NavController,
-    viewModel: ProfileViewModel = hiltViewModel()
+    viewModel: ProfileViewModel = hiltViewModel(),
+    userId: String
 ) {
     val state by viewModel.state.collectAsState()
-
     LaunchedEffect(state.isSignedOut) {
         if (state.isSignedOut) {
             navController.navigate("login") { popUpTo(0) }
@@ -78,24 +78,49 @@ fun ProfileScreen(
                 Spacer(modifier = Modifier.height(20.dp))
 
 
+                // Выносим базовые модификаторы в отдельную переменную
+                val avatarModifier = Modifier
+                    .size(140.dp)
+                    .clip(CircleShape)
+                    .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                    .background(Color.LightGray)
+
                 Box(contentAlignment = Alignment.BottomEnd) {
                     AsyncImage(
                         model = state.user?.photoUrl ?: "",
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .size(140.dp)
-                            .clip(CircleShape)
-                            .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape)
-                            .background(Color.LightGray)
-                            .clickable {
+                        // Добавляем клик только если это МОЙ профиль
+                        modifier = if (state.isMyProfile) {
+                            avatarModifier.clickable {
                                 singlePhotoPickerLauncher.launch(
                                     PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                                 )
-                            },
+                            }
+                        } else {
+                            avatarModifier
+                        },
                         error = painterResource(R.drawable.ic_launcher_foreground),
                         placeholder = painterResource(R.drawable.ic_launcher_foreground)
                     )
+
+
+                    if (state.isMyProfile) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(40.dp).offset(x = 0.dp, y = 0.dp),
+                            shadowElevation = 4.dp
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CameraAlt,
+                                contentDescription = "Edit",
+                                tint = Color.White,
+                                modifier = Modifier.padding(8.dp)
+                            )
+                        }
+                    }
+
 
 
                     Surface(
@@ -115,15 +140,19 @@ fun ProfileScreen(
 
                 Spacer(modifier = Modifier.height(32.dp))
 
-
                 OutlinedTextField(
                     value = state.user?.username ?: "",
                     onValueChange = { viewModel.handleIntent(ProfileIntent.OnNameChanged(it)) },
                     label = { Text("Имя пользователя") },
                     singleLine = true,
+                    readOnly = !state.isMyProfile,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    trailingIcon = { Icon(Icons.Default.Edit, contentDescription = null) }
+                    trailingIcon = {
+                        if (state.isMyProfile) {
+                            Icon(Icons.Default.Edit, contentDescription = null)
+                        }
+                    }
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -141,28 +170,30 @@ fun ProfileScreen(
 
                 Spacer(modifier = Modifier.weight(1f))
 
-                Button(
-                    onClick = { viewModel.handleIntent(ProfileIntent.OnSaveProfile) },
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    enabled = !state.user?.username.isNullOrBlank()
-                ) {
-                    Text("Сохранить изменения", fontSize = 16.sp)
-                }
+                if (state.isMyProfile) {
+                    Button(
+                        onClick = { viewModel.handleIntent(ProfileIntent.OnSaveProfile) },
+                        modifier = Modifier.fillMaxWidth().height(56.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        enabled = !state.user?.username.isNullOrBlank()
+                    ) {
+                        Text("Сохранить изменения", fontSize = 16.sp)
+                    }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                OutlinedButton(
-                    onClick = { viewModel.handleIntent(ProfileIntent.OnSignOutClicked) },
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                ) {
-                    Text("Выйти из аккаунта")
+                    OutlinedButton(
+                        onClick = { viewModel.handleIntent(ProfileIntent.OnSignOutClicked) },
+                        modifier = Modifier.fillMaxWidth().height(56.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    ) {
+                        Text("Выйти из аккаунта")
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
-            }
         }
     }
+}
 }

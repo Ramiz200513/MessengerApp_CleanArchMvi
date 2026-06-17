@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.library")
     id("org.jetbrains.kotlin.android")
@@ -7,14 +9,23 @@ plugins {
     kotlin("kapt")
 }
 
+val localProperties = Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localProperties.load(localPropertiesFile.inputStream())
+}
+
 android {
-    namespace = "com.example.messengerapp.data" // <-- ВАЖНО: убедись, что тут data
+    namespace = "com.example.messengerapp.data"
     compileSdk = 35
 
     defaultConfig {
         minSdk = 26
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles("consumer-rules.pro")
+
+        buildConfigField("String", "OPENAI_API_KEY", localProperties.getProperty("OPENAI_API_KEY") ?: "\"\"")
+        buildConfigField("String", "GROQ_API_KEY", localProperties.getProperty("GROQ_API_KEY") ?: "\"\"")
     }
 
     buildTypes {
@@ -29,6 +40,9 @@ android {
     }
     kotlinOptions {
         jvmTarget = "1.8"
+    }
+    buildFeatures {
+        buildConfig = true
     }
 }
 
@@ -48,10 +62,8 @@ dependencies {
     implementation("com.google.firebase:firebase-firestore")
     implementation("com.google.firebase:firebase-storage")
 
-
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
-
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
